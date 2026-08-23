@@ -1,21 +1,25 @@
-name: mini-platform
+name: system-driven
 version: 1
-description: Standard OpenSpec workflow with a richer capability-spec template for mini systems
+description: Standard OpenSpec workflow with rich capability contracts for multi-surface systems
 artifacts:
   - id: proposal
     generates: proposal.md
     description: Initial proposal document outlining the change
     template: proposal.md
     instruction: |
-      Create the proposal document that establishes WHY this change is needed.
+      Create the proposal document that establishes WHY this change is needed
+      and draws its product/system boundary. Keep it concise; implementation
+      choices belong in design.md.
 
       Sections:
       - **Why**: 1-2 sentences on the problem or opportunity. What problem does this solve? Why now?
+      - **Desired Outcomes**: Observable user, operator, business, or system outcomes and their success signals. Avoid implementation output metrics.
       - **What Changes**: Bullet list of changes. Be specific about new capabilities, modifications, or removals. Mark breaking changes with **BREAKING**.
       - **Capabilities**: Identify which specs will be created or modified:
         - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<capability-path>/spec.md`. Use kebab-case for path segments you introduce (e.g., `user-auth` or `identity/user-auth`) and follow the project's existing spec organization.
         - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Use the exact existing path under `openspec/specs/`. Leave empty if no requirement changes.
-      - **Impact**: Affected code, APIs, dependencies, or systems.
+      - **Scope**: Behaviors and surfaces in scope plus explicit non-goals that prevent likely expansion.
+      - **Impact**: Affected repositories/packages, data, API/SDK compatibility, admin/web/mobile surfaces, tasks/integrations, operators, rollout, and dependencies at a high level.
 
       IMPORTANT: The Capabilities section is critical. It creates the contract between
       proposal and specs phases. Research existing specs before filling this in.
@@ -37,7 +41,7 @@ artifacts:
 
   - id: specs
     generates: "specs/**/*.md"
-    description: Rich capability contracts for multi-surface mini systems
+    description: Rich capability contracts for multi-surface systems
     template: spec.md
     instruction: |
       Create specification files that define WHAT the capability guarantees.
@@ -59,6 +63,12 @@ artifacts:
         states, inputs/outputs/errors, permissions, delivery semantics, and limits);
       - at least one `#### Scenario:` using WHEN/THEN, including failure and
         boundary cases when they change the contract.
+
+      Every behavior-changing OpenSpec change must add or modify at least one
+      `Kind: acceptance` requirement across its capability deltas. It defines
+      the observable, binary line for accepting the change. Pure refactors,
+      tooling, and documentation use `skip_specs: true` instead of inventing an
+      acceptance criterion.
 
       Surface values may include `admin`, `web`, `mobile`, `api`, `sdk`,
       `worker`, `integration`, and `cli`. They describe where the guarantee is
@@ -142,6 +152,11 @@ artifacts:
       Sections:
       - **Context**: Only the current state and constraints needed to explain the approach. Reference the proposal for motivation instead of restating it (e.g., "See proposal.md - Why").
       - **Goals / Non-Goals**: What this design achieves and explicitly excludes. Don't restate the proposal's scope - add only design-level boundaries.
+      - **System Coverage**: Keep only affected rows and map requirements to the smallest accountable system boundary and its verification seam.
+      - **Domain And State Model**: Authoritative resources/entities, invariants, relations, states, transitions, and projections when applicable.
+      - **Surface And Contract Design**: API, SDK, operator/admin, web/mobile, event, file, or CLI boundaries, including permissions, errors, versioning, and stale/offline behavior when applicable.
+      - **Runtime And External Boundaries**: Request, task, integration, realtime, and migration sequences with transaction and failure ownership.
+      - **Cross-Cutting Decisions**: Authorization, tenancy, idempotency, cache invalidation, observability, compatibility, and operability only when affected.
       - **Decisions**: Key technical choices with rationale (why X over Y?). Include alternatives considered for each decision.
       - **Risks / Trade-offs**: Known limitations, things that could go wrong. Format: [Risk] → Mitigation
       - **Migration Plan**: Steps to deploy, rollback strategy (if applicable)
@@ -157,7 +172,14 @@ artifacts:
       proposal for motivation and, once written, the specs for requirements -
       if a section would only restate them, point to them instead.
 
-      Good design docs explain the "why" behind technical decisions.
+      Map each affected requirement to one accountable boundary rather than
+      duplicating behavior across clients, APIs, workers, and integrations.
+      For asynchronous or external work define delivery, retry,
+      idempotency/deduplication, concurrency, transaction ownership, evidence,
+      and operator visibility only as applicable. Put framework-specific
+      routing rules in the project's `openspec/config.yaml`.
+      Good design docs explain the "why" behind technical decisions and delete
+      unused template rows and sections.
     requires:
       - proposal
 
@@ -190,17 +212,16 @@ artifacts:
 
       Finish with a small Definition of Done section. Keep only applicable
       checks and express each as a tracked checkbox. It must cover:
+      - strict structural validation with `openspec validate <change> --strict`;
       - evidence that every acceptance criterion in scope is satisfied;
       - focused tests and surface-specific checks for the affected packages;
-      - mini architecture lint for backend/registry/service/task/integration
-        changes using
-        `uv run mini registry-context lint <target> --lint-enable --lint-level enforce --json`;
-      - migrations, generated SDK compatibility, rollout/rollback, operator
+      - migrations, public-contract compatibility, rollout/rollback, operator
         visibility, and documentation only when the change actually affects them.
 
-      The mini linter proves framework architecture conformance; it does not
-      replace behavioral tests or acceptance evidence. Documentation-only
-      changes may omit it with a brief reason in the task list.
+      Stack-specific checks belong in project artifact rules. Linters prove
+      implementation conformance; they do not validate requirement prose and
+      do not replace behavioral tests or acceptance evidence. OpenSpec
+      validates its own artifacts.
     requires:
       - specs
       - design
