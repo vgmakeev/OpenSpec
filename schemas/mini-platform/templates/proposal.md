@@ -1,52 +1,29 @@
 ## Why
 
-<!-- What problem or opportunity exists, and why is it worth changing now? -->
+<!-- Explain the motivation for this change. What problem does this solve? Why now? -->
 
-## Desired Outcomes
+## What Changes
 
-<!-- Measurable user, operator, business, or system outcomes. Avoid output metrics such as lines of code. -->
-
-- **O1:** <!-- outcome and success signal -->
-
-## Scope
-
-### In Scope
-
-- <!-- behavior or surface included -->
-
-### Non-Goals
-
-- <!-- likely scope expansion explicitly excluded -->
+<!-- Describe what will change. Be specific about new capabilities, modifications, or removals. -->
 
 ## Capabilities
 
 ### New Capabilities
-
-<!-- Each item creates specs/<capability-path>/spec.md. Use kebab-case for new path segments. -->
-
-- `<capability-path>`: <!-- durable responsibility of this capability -->
+<!-- Capabilities being introduced. Use kebab-case for path segments you introduce
+     (e.g., user-auth or identity/user-auth) that follow the project's existing
+     spec organization. Each creates specs/<capability-path>/spec.md. -->
+- `<capability-path>`: <brief description of what this capability covers>
 
 ### Modified Capabilities
-
-<!-- Use exact existing paths under openspec/specs/. Leave empty when none change. -->
-
-- `<existing-capability-path>`: <!-- contract being changed -->
-
-## Change Shape
-
-<!-- Inventory only. The design artifact decides the implementation. Delete irrelevant rows. -->
-
-| Surface / boundary | Affected | Expected change |
-|---|---:|---|
-| Registry resource / CRUDL / aggregate | yes/no | |
-| Standard or custom mini-admin | yes/no | |
-| Web/mobile client through generated SDK | yes/no | |
-| Service / CustomMethod / raw protocol adapter | yes/no | |
-| Background task / schedule | yes/no | |
-| External connection / trigger / connector | yes/no | |
-| Realtime / event / push | yes/no | |
-| Migration / compatibility window | yes/no | |
+<!-- Existing capabilities whose REQUIREMENTS are changing (not just implementation).
+     Only list here if spec-level behavior changes. Each needs a delta spec file.
+     Use the exact existing path under openspec/specs/. Leave empty if no requirement
+     changes. A change with no capabilities at all (pure refactor, tooling, docs)
+     must set `skip_specs: true` in its .openspec.yaml - openspec validate rejects
+     a zero-delta change without that marker. Do not invent a requirement just to
+     satisfy validation. -->
+- `<existing-capability-path>`: <what requirement is changing>
 
 ## Impact
 
-<!-- Repositories, packages, APIs/SDK versions, data, operators, dependencies, rollout, and likely blast radius. -->
+<!-- Affected code, APIs, dependencies, systems -->

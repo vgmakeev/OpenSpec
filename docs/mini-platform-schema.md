@@ -5,7 +5,12 @@ admin behavior, custom admin workflows, web/mobile SDK clients, business
 services, background work, integrations, realtime delivery, and data/API
 migrations.
 
-## Why the default shapes were not enough
+## What is customized
+
+The artifact lifecycle remains the standard OpenSpec flow: proposal and specs,
+design, tasks, apply, and archive all retain their stock dependencies and
+semantics. The customization is deliberately concentrated in the capability
+spec template.
 
 The default OpenSpec schema correctly treats a spec as a behavioral contract,
 but its minimal template makes scenarios the dominant visible structure.
@@ -13,19 +18,18 @@ GitHub Spec Kit adds user stories, functional requirements, entities,
 measurable outcomes, technical context, constitution gates, contracts, and
 story-oriented tasks. Those are useful ingredients, but a user-story-first
 shape is still incomplete for multi-surface systems where state ownership,
-service boundaries, asynchronous work, compatibility, and operator behavior
-are first-class concerns.
+asynchronous work, compatibility, and operator behavior are first-class
+concerns.
 
 The mini schema combines the strongest parts without turning one document into
 a giant implementation plan:
 
 | Concern | Durable home |
 |---|---|
-| Problem, outcomes, scope, affected surfaces | `proposal.md` |
+| Problem, proposed changes, capabilities, impact | `proposal.md` |
 | Outcomes, invariants, states, public contracts, workflows, quality constraints | capability specs |
-| Registry/service/admin/client/task/integration mapping and decisions | `design.md` |
-| Requirement-quality review and independent evidence | `verification.md` |
-| Small vertical implementation increments | `tasks.md` |
+| Technical approach and decisions | `design.md` |
+| Implementation checklist and its verification | `tasks.md` |
 
 ## Requirement model
 
@@ -64,9 +68,11 @@ workflow-heavy operator tool -> custom mini-admin using the shared SDK
 web/mobile client -> generated, version-pinned SDK contract
 ```
 
-The templates also require explicit decisions for authorization, row scopes,
-tenancy, idempotency, cache invalidation, observability, realtime, API/SDK
-compatibility, migrations, and rollback whenever those concerns apply.
+This routing is design guidance for mini projects, not an extra artifact or a
+change to OpenSpec orchestration. Authorization, row scopes, tenancy,
+idempotency, cache invalidation, observability, realtime, API/SDK compatibility,
+migrations, and rollback belong in requirements when externally normative and
+in design when they are implementation choices.
 
 ## Lifecycle ownership
 
