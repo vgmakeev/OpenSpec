@@ -1,6 +1,6 @@
-name: system-driven
+name: mini-system
 version: 1
-description: Standard OpenSpec workflow with rich capability contracts for multi-surface systems
+description: Standard OpenSpec workflow for mini systems spanning backend, admin, web, and Flutter clients
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -41,7 +41,7 @@ artifacts:
 
   - id: specs
     generates: "specs/**/*.md"
-    description: Rich capability contracts for multi-surface systems
+    description: Rich capability contracts for multi-surface mini systems
     template: spec.md
     instruction: |
       Create specification files that define WHAT the capability guarantees.
@@ -152,7 +152,7 @@ artifacts:
       Sections:
       - **Context**: Only the current state and constraints needed to explain the approach. Reference the proposal for motivation instead of restating it (e.g., "See proposal.md - Why").
       - **Goals / Non-Goals**: What this design achieves and explicitly excludes. Don't restate the proposal's scope - add only design-level boundaries.
-      - **System Coverage**: Keep only affected rows and map requirements to the smallest accountable system boundary and its verification seam.
+      - **Mini System Coverage**: Keep only affected rows and map requirements to the smallest owning mini or client boundary and its verification seam.
       - **Domain And State Model**: Authoritative resources/entities, invariants, relations, states, transitions, and projections when applicable.
       - **Surface And Contract Design**: API, SDK, operator/admin, web/mobile, event, file, or CLI boundaries, including permissions, errors, versioning, and stale/offline behavior when applicable.
       - **Runtime And External Boundaries**: Request, task, integration, realtime, and migration sequences with transaction and failure ownership.
@@ -172,12 +172,21 @@ artifacts:
       proposal for motivation and, once written, the specs for requirements -
       if a section would only restate them, point to them instead.
 
-      Map each affected requirement to one accountable boundary rather than
-      duplicating behavior across clients, APIs, workers, and integrations.
-      For asynchronous or external work define delivery, retry,
-      idempotency/deduplication, concurrency, transaction ownership, evidence,
-      and operator visibility only as applicable. Put framework-specific
-      routing rules in the project's `openspec/config.yaml`.
+      Route behavior through the smallest correct mini boundary:
+      - persisted product/admin state -> registry Resource + CRUDL;
+      - counters, sums, and bucketed summaries -> ResourceRuntime.aggregate;
+      - business invariants, transactions, and FSM decisions -> service;
+      - callable non-CRUDL command/read -> CustomMethod;
+      - webhook, callback, file/streaming, multipart, legacy facade, or custom protocol -> classified raw adapter;
+      - work outside the request -> task;
+      - provider work or inbound event -> External boundary + connection/trigger;
+      - ordinary operator state -> registry-driven mini-admin;
+      - workflow-heavy operator tool -> custom mini-admin using the shared SDK;
+      - web or Flutter client -> generated, versioned SDK contract.
+
+      For tasks and external calls define retry, idempotency/deduplication,
+      concurrency, transaction split, evidence, and operator visibility only
+      as applicable. Never hold a database transaction across a provider call.
       Good design docs explain the "why" behind technical decisions and delete
       unused template rows and sections.
     requires:
@@ -215,13 +224,16 @@ artifacts:
       - strict structural validation with `openspec validate <change> --strict`;
       - evidence that every acceptance criterion in scope is satisfied;
       - focused tests and surface-specific checks for the affected packages;
+      - mini architecture lint for backend/registry/service/task/integration
+        changes using
+        `uv run mini registry-context lint <target> --lint-enable --lint-level enforce --json`;
       - migrations, public-contract compatibility, rollout/rollback, operator
         visibility, and documentation only when the change actually affects them.
 
-      Stack-specific checks belong in project artifact rules. Linters prove
-      implementation conformance; they do not validate requirement prose and
-      do not replace behavioral tests or acceptance evidence. OpenSpec
-      validates its own artifacts.
+      Mini lint proves implementation architecture conformance; it does not
+      validate requirement prose and does not replace behavioral tests or
+      acceptance evidence. OpenSpec validates its own artifacts. Client-only
+      and documentation changes may mark mini lint N/A with a brief reason.
     requires:
       - specs
       - design

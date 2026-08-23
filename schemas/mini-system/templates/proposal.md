@@ -42,5 +42,5 @@
 
 ## Impact
 
-<!-- Affected repositories/packages, data, APIs/SDKs, admin/web/mobile surfaces,
+<!-- Affected repositories/packages, data, APIs/SDKs, mini-admin/web/Flutter surfaces,
      tasks/integrations, operators, rollout, dependencies, and blast radius. -->

@@ -5,10 +5,12 @@ import path from 'node:path';
 import { loadSchema } from '../../src/core/artifact-graph/schema.js';
 import { buildUpdatedSpec, findSpecUpdates } from '../../src/core/specs-apply.js';
 
+const SCHEMAS = ['mini-system', 'flutter-app'] as const;
+
 const RICH_DELTA = [
   '## Purpose',
   '',
-  'Defines a durable order cancellation contract across API, SDK, admin, and workers.',
+  'Defines a durable cancellation contract across client, API, and asynchronous work.',
   '',
   '## ADDED Requirements',
   '',
@@ -16,7 +18,7 @@ const RICH_DELTA = [
   '',
   '**Kind:** contract',
   '',
-  '**Surfaces:** api, sdk, admin, mobile',
+  '**Surfaces:** api, sdk, mobile',
   '',
   '**Owner:** orders',
   '',
@@ -34,7 +36,7 @@ const RICH_DELTA = [
   '',
 ].join('\n');
 
-describe('system-driven packaged schema', () => {
+describe('project-specific packaged schemas', () => {
   let tempDir: string | undefined;
 
   afterEach(async () => {
@@ -42,8 +44,8 @@ describe('system-driven packaged schema', () => {
     tempDir = undefined;
   });
 
-  it('preserves the standard OpenSpec artifact graph', async () => {
-    const schema = loadSchema(path.join(process.cwd(), 'schemas', 'system-driven', 'schema.yaml'));
+  it.each(SCHEMAS)('%s preserves the standard OpenSpec artifact graph', async (name) => {
+    const schema = loadSchema(path.join(process.cwd(), 'schemas', name, 'schema.yaml'));
 
     expect(schema.artifacts.map((artifact) => artifact.id)).toEqual([
       'proposal',
@@ -63,34 +65,56 @@ describe('system-driven packaged schema', () => {
     expect(schema.artifacts.find((artifact) => artifact.id === 'tasks')?.instruction).toContain(
       'openspec validate <change> --strict'
     );
-    expect(schema.artifacts.find((artifact) => artifact.id === 'tasks')?.instruction).not.toContain(
-      'uv run mini'
-    );
     expect(schema.artifacts.find((artifact) => artifact.id === 'specs')?.instruction).not.toContain(
       'graph-ba'
     );
     expect(schema.artifacts.find((artifact) => artifact.id === 'specs')?.instruction).toContain(
-      'Every behavior-changing OpenSpec change must add or modify at least one'
+      'Every behavior-changing'
     );
 
-    const proposalTemplate = await fs.readFile(
-      path.join(process.cwd(), 'schemas', 'system-driven', 'templates', 'proposal.md'),
+    const proposal = await fs.readFile(
+      path.join(process.cwd(), 'schemas', name, 'templates', 'proposal.md'),
       'utf8'
     );
-    const designTemplate = await fs.readFile(
-      path.join(process.cwd(), 'schemas', 'system-driven', 'templates', 'design.md'),
-      'utf8'
-    );
-    expect(proposalTemplate).toContain('## Desired Outcomes');
-    expect(proposalTemplate).toContain('### Non-Goals');
-    expect(designTemplate).toContain('## System Coverage');
-    expect(designTemplate).toContain('| Operator and administrative interfaces |');
-    expect(designTemplate).toContain('| Client applications and public contracts |');
-    expect(designTemplate).not.toContain('mini-admin');
+    expect(proposal).toContain('## Desired Outcomes');
+    expect(proposal).toContain('### Non-Goals');
   });
 
-  it('preserves rich requirement metadata and contract tables when applying a delta', async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openspec-system-driven-'));
+  it('specializes mini full-stack coverage and Definition of Done', async () => {
+    const design = await fs.readFile(
+      path.join(process.cwd(), 'schemas', 'mini-system', 'templates', 'design.md'),
+      'utf8'
+    );
+    const tasks = await fs.readFile(
+      path.join(process.cwd(), 'schemas', 'mini-system', 'templates', 'tasks.md'),
+      'utf8'
+    );
+
+    expect(design).toContain('## Mini System Coverage');
+    expect(design).toContain('| Operator UI: registry-driven / custom mini-admin |');
+    expect(design).toContain('| Client contracts: generated SDK / web / Flutter |');
+    expect(tasks).toContain('uv run mini registry-context lint <target>');
+  });
+
+  it('specializes standalone Flutter coverage and Definition of Done', async () => {
+    const design = await fs.readFile(
+      path.join(process.cwd(), 'schemas', 'flutter-app', 'templates', 'design.md'),
+      'utf8'
+    );
+    const tasks = await fs.readFile(
+      path.join(process.cwd(), 'schemas', 'flutter-app', 'templates', 'tasks.md'),
+      'utf8'
+    );
+
+    expect(design).toContain('## Flutter App Coverage');
+    expect(design).toContain('| Data: API / storage / offline / sync / conflicts / cache |');
+    expect(design).not.toContain('mini-admin');
+    expect(tasks).toContain('flutter analyze');
+    expect(tasks).not.toContain('uv run mini');
+  });
+
+  it('preserves rich requirement blocks when OpenSpec applies a delta', async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openspec-project-schemas-'));
     const changeDir = path.join(tempDir, 'openspec', 'changes', 'cancel-order');
     const mainSpecsDir = path.join(tempDir, 'openspec', 'specs');
     const source = path.join(changeDir, 'specs', 'orders', 'cancellation', 'spec.md');
@@ -102,7 +126,7 @@ describe('system-driven packaged schema', () => {
 
     expect(result.counts.added).toBe(1);
     expect(result.rebuilt).toContain('### Requirement: Cancel order command');
-    expect(result.rebuilt).toContain('**Surfaces:** api, sdk, admin, mobile');
+    expect(result.rebuilt).toContain('**Surfaces:** api, sdk, mobile');
     expect(result.rebuilt).toContain('| cancellable order | accepted result | — |');
     expect(result.rebuilt).toContain('#### Scenario: Terminal order is rejected');
   });

@@ -8,7 +8,7 @@
 
 **Kind:** acceptance
 
-**Surfaces:** <!-- admin | web | mobile | api | sdk | worker | integration | cli -->
+**Surfaces:** <!-- mini-admin | web | flutter | api | sdk | worker | integration | cli -->
 
 **Owner:** <!-- accountable product/domain owner, not a source file -->
 

@@ -10,16 +10,16 @@
 **Non-Goals:**
 <!-- What is explicitly out of scope -->
 
-## System Coverage
+## Mini System Coverage
 
 <!-- Delete unused rows. Map each affected area to its smallest accountable boundary. -->
 
 | Area | Decision / owner | Requirements | Verification seam |
 |---|---|---|---|
-| Domain, data, and state | | | |
-| Application behavior and APIs | | | |
-| Operator and administrative interfaces | | | |
-| Client applications and public contracts | | | |
+| Backend state and reads: Resource / CRUDL / aggregate | | | |
+| Domain behavior and API: service / FSM / CustomMethod / raw adapter | | | |
+| Operator UI: registry-driven / custom mini-admin | | | |
+| Client contracts: generated SDK / web / Flutter | | | |
 | Async and external: task / schedule / integration | | | |
 | Delivery and evolution: sync/realtime / cache / migration / compatibility | | | |
 
