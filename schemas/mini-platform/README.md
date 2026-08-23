@@ -21,9 +21,11 @@ express outcomes, invariants, states, interfaces, workflows, and quality
 constraints. Requirement bodies may include structured state, contract,
 permission, delivery, compatibility, or limit tables before their scenarios.
 
-Stable Trace IDs (`AC`, `RULE`, `STATE`, `CONTRACT`, and `FLOW`) belong to the
-capability specs. graph-ba may index links from code/tests/evidence to those IDs,
-but it does not own the OpenSpec change lifecycle.
+Acceptance criteria may use stable `AC` IDs when tests, repositories, releases,
+or external documents need to cite them. Other requirement kinds do not need an
+ID taxonomy merely for graph tooling. The task template includes a compact,
+conditional Definition of Done with the mini architecture linter; it does not
+add another artifact or change the OpenSpec lifecycle.
 
 ## Use
 

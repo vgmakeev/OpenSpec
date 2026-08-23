@@ -45,7 +45,7 @@ artifacts:
       scenarios are evidence for requirements rather than the entire spec.
 
       A requirement may express one of these semantic kinds:
-      - `outcome` - a user, operator, or downstream result;
+      - `acceptance` - a binary, observable condition for accepting the capability;
       - `invariant` - a domain, authorization, tenancy, consistency, or safety rule;
       - `state` - lifecycle states, transitions, guards, and observable side effects;
       - `contract` - an API, SDK, UI, event, file, or provider-visible boundary;
@@ -53,9 +53,6 @@ artifacts:
       - `quality` - performance, reliability, compatibility, privacy, or operability.
 
       Each requirement must have:
-      - a stable Trace ID in its heading using one of `AC`, `RULE`, `STATE`,
-        `CONTRACT`, or `FLOW`, for example
-        `### Requirement: [CONTRACT-orders-cancel-v1] Cancel order command`;
       - a `Kind`, affected `Surfaces`, and accountable product/domain `Owner`;
       - a normative SHALL/MUST statement;
       - enough structured detail to remove ambiguity (tables are encouraged for
@@ -68,9 +65,11 @@ artifacts:
       observable, not which source file will implement it. Avoid internal
       classes/functions, framework choices, and implementation steps.
 
-      Stable Trace IDs belong to the capability, not to the temporary change.
-      Reuse an existing ID when modifying its requirement. They can be indexed
-      by traceability tools, but do not add a second change lifecycle.
+      Acceptance requirements SHOULD use a stable `AC-<capability>-<number>` ID
+      in the heading when tests, repositories, releases, or external documents
+      need to cite them. Do not add IDs to every invariant, state, contract, or
+      workflow merely to populate a traceability tool. `Kind` carries their
+      semantics without an ID taxonomy.
 
       Create one spec file per capability listed in the proposal's Capabilities section.
       `<capability-path>` is the spec directory relative to `specs/` (for example,
@@ -90,7 +89,8 @@ artifacts:
       - **RENAMED Requirements**: Name changes only - use FROM:/TO: format
 
       Format requirements:
-      - Each requirement: `### Requirement: [<trace-id>] <name>` followed by its metadata and normative statement
+      - Each requirement: `### Requirement: <name>` followed by its metadata and normative statement
+      - Acceptance criteria that need stable references: `### Requirement: [AC-<capability>-<number>] <name>`
       - Use SHALL/MUST for normative requirements (avoid should/may)
       - Each scenario: `#### Scenario: <name>` with WHEN/THEN format
       - **CRITICAL**: Scenarios MUST use exactly 4 hashtags (`####`). Using 3 hashtags or bullets will fail silently.
@@ -116,7 +116,7 @@ artifacts:
       1. Locate the existing requirement in `<planningHome.root>/openspec/specs/<capability-path>/spec.md` (the same store-aware root as above)
       2. Copy the ENTIRE requirement block (from `### Requirement:` through all scenarios)
       3. Paste under `## MODIFIED Requirements` and edit to reflect new behavior
-      4. Ensure header text, including its Trace ID, matches exactly (whitespace-insensitive)
+      4. Ensure header text matches exactly (whitespace-insensitive)
 
       Common pitfall: Using MODIFIED with partial content loses detail at archive time.
       If adding new concerns without changing existing behavior, use ADDED instead.
@@ -187,6 +187,20 @@ artifacts:
         multiple implementation tasks.
 
       Reference specs for what needs to be built, design for how to build it.
+
+      Finish with a small Definition of Done section. Keep only applicable
+      checks and express each as a tracked checkbox. It must cover:
+      - evidence that every acceptance criterion in scope is satisfied;
+      - focused tests and surface-specific checks for the affected packages;
+      - mini architecture lint for backend/registry/service/task/integration
+        changes using
+        `uv run mini registry-context lint <target> --lint-enable --lint-level enforce --json`;
+      - migrations, generated SDK compatibility, rollout/rollback, operator
+        visibility, and documentation only when the change actually affects them.
+
+      The mini linter proves framework architecture conformance; it does not
+      replace behavioral tests or acceptance evidence. Documentation-only
+      changes may omit it with a brief reason in the task list.
     requires:
       - specs
       - design

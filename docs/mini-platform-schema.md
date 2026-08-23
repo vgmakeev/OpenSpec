@@ -33,15 +33,20 @@ a giant implementation plan:
 
 ## Requirement model
 
-Every normative requirement has a stable ID and one semantic kind:
+Every normative requirement has one semantic kind:
 
-| Prefix | Meaning | Example |
+| Kind | Meaning | Example |
 |---|---|---|
-| `AC` | Observable outcome | order cancellation is visible to the customer |
-| `RULE` | Domain or quality invariant | a captured payment cannot be silently discarded |
-| `STATE` | Lifecycle and transitions | pending -> cancelled with explicit guards |
-| `CONTRACT` | API, SDK, UI, event, or file boundary | versioned mobile cancellation command |
-| `FLOW` | Multi-step orchestration | cancel, compensate provider, publish status |
+| `acceptance` | Binary observable acceptance condition | order cancellation is visible to the customer |
+| `invariant` | Domain or safety rule | a captured payment cannot be silently discarded |
+| `state` | Lifecycle and transitions | pending -> cancelled with explicit guards |
+| `contract` | API, SDK, UI, event, or file boundary | versioned mobile cancellation command |
+| `workflow` | Multi-step orchestration | cancel, compensate provider, publish status |
+| `quality` | Measurable operational constraint | updates become visible within five seconds |
+
+Acceptance criteria may carry stable `AC` IDs when they need to be cited by
+tests, repositories, releases, or external documents. Other requirement kinds
+do not receive IDs merely to feed graph tooling; their `Kind` is sufficient.
 
 The requirement body can contain tables for contracts or state machines. It
 still includes at least one scenario because examples and failure cases are the
@@ -74,13 +79,27 @@ idempotency, cache invalidation, observability, realtime, API/SDK compatibility,
 migrations, and rollback belong in requirements when externally normative and
 in design when they are implementation choices.
 
+## Definition of Done
+
+The normal `tasks.md` artifact ends with a small conditional Definition of
+Done. It connects acceptance criteria to evidence, requires affected package
+checks, and runs mini's enforce-level architecture linter for backend,
+registry, service, task, or integration changes:
+
+```bash
+uv run mini registry-context lint <target> --lint-enable --lint-level enforce --json
+```
+
+This is architecture evidence, not a behavioral acceptance test. Migration,
+SDK, rollout, operator, and documentation checks remain conditional.
+
 ## Lifecycle ownership
 
 OpenSpec owns proposal, review, apply, sync, and archive. graph-ba is optional
 trace infrastructure only:
 
 ```text
-OpenSpec requirement ID
+OpenSpec acceptance criterion (optional stable AC ID)
   <- IMPLEMENTS - source/registry/service/UI contract
   <- COVERS - test definition
   <- VERIFIES - executed or manual evidence
@@ -88,4 +107,4 @@ OpenSpec requirement ID
 ```
 
 There is no graph-ba proposal folder, task list, change gate, acceptance, or
-archive lifecycle in this model.
+archive lifecycle in this model. Projects may omit graph-ba entirely.
