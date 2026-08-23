@@ -1,0 +1,187 @@
+name: mini-platform
+version: 1
+description: Mini-native multi-surface workflow - proposal -> specs -> design -> verification -> tasks
+
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Change intent, outcomes, scope, capabilities, surfaces, and impact
+    template: proposal.md
+    instruction: |
+      Establish WHY the change is needed and draw its product/system boundary.
+
+      Keep the proposal concise. It is a routing artifact, not a technical design.
+      It must:
+      - state the problem, desired outcomes, and measurable success;
+      - state in-scope and non-goals;
+      - name every new or modified capability spec;
+      - inventory affected product surfaces and runtime boundaries at a high level;
+      - identify affected repositories/packages and compatibility risk.
+
+      Surface choices may include registry CRUDL/admin, custom mini-admin,
+      generated SDK, web, mobile, service/CustomMethod, raw protocol adapter,
+      task, integration, event/realtime, CLI, or migration. Do not decide their
+      implementation here; the inventory prevents a backend-only view of a
+      multi-surface feature.
+
+      Capabilities are the contract between proposal and specs:
+      - New capabilities create `specs/<capability-path>/spec.md`.
+      - Modified capabilities use the exact existing path under
+        `openspec/specs/` and create a delta at the same relative path.
+      - Use kebab-case for new path segments.
+      - Pure refactors/tooling/docs changes may set `skip_specs: true` in the
+        change's `.openspec.yaml`; do not invent behavioral requirements.
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Durable capability contracts with outcomes, invariants, states, interfaces, workflows, quality constraints, and scenarios
+    template: spec.md
+    instruction: |
+      Define WHAT the capability guarantees, independent of a particular code
+      layout. Scenarios are evidence for requirements, not the entire spec.
+
+      Create one delta spec per capability listed in proposal.md. Preserve the
+      exact capability path. A rich requirement may describe one of these kinds:
+      - `outcome` - user/operator/downstream result;
+      - `invariant` - domain, authorization, tenancy, consistency, or safety rule;
+      - `state` - lifecycle, transition, guard, and side effect contract;
+      - `contract` - API, SDK, UI, event, file, or provider-visible boundary;
+      - `workflow` - ordered behavior across components or time;
+      - `quality` - performance, reliability, compatibility, privacy, or operability.
+
+      Each requirement must have:
+      - a stable Trace ID in its heading using one of `AC`, `RULE`, `STATE`,
+        `CONTRACT`, or `FLOW`, for example
+        `### Requirement: [CONTRACT-orders-cancel-v1] Cancel order command`;
+      - a `Kind`, affected `Surfaces`, and accountable product/domain `Owner`;
+      - a normative SHALL/MUST statement;
+      - enough structured detail to remove ambiguity (tables are encouraged for
+        states, inputs/outputs/errors, permissions, delivery semantics, and limits);
+      - at least one `#### Scenario:` using WHEN/THEN, including failure and
+        boundary cases when they change the contract.
+
+      Stable Trace IDs belong to the capability, not to the temporary change.
+      Reuse an existing ID when modifying its requirement. These IDs are the
+      only input graph-ba needs for optional trace projection; graph-ba does not
+      own proposal, review, apply, or archive lifecycle.
+
+      Delta operations use exact level-2 headings:
+      - `## ADDED Requirements`
+      - `## MODIFIED Requirements` (copy the complete existing requirement)
+      - `## REMOVED Requirements` (include Reason and Migration)
+      - `## RENAMED Requirements` (FROM/TO only)
+
+      New capabilities begin with `## Purpose` of at least 50 characters.
+      Existing capability deltas omit Purpose unless creating the capability.
+      Keep auxiliary system analysis in design.md: OpenSpec archives Purpose and
+      complete requirement blocks into living specs, while arbitrary sibling
+      sections are not a durable merge contract.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Mini-native system design and multi-surface implementation projection
+    template: design.md
+    instruction: |
+      Explain HOW the approved requirements map onto the system. The design is
+      required because mini applications may span registry state, generated
+      admin, custom admin, web/mobile SDK clients, services, tasks, integrations,
+      realtime delivery, and migrations.
+
+      Start with the smallest mini-native boundary:
+      1. registry Resource + CRUDL for persisted product/admin state;
+      2. ResourceRuntime.aggregate for counters, sums, and bucketed summaries;
+      3. service for invariants, calculations, FSM transitions, and multi-table writes;
+      4. CustomMethod for callable non-CRUDL commands/reads;
+      5. raw FastAPI only for webhooks/callbacks, files/streaming, multipart,
+         legacy facades, or custom protocols;
+      6. task for work that finishes outside the request;
+      7. External boundary plus connection/trigger for provider work or inbound events;
+      8. custom mini-admin only for workflow-heavy screens; ordinary management
+         remains registry-driven;
+      9. generated, version-pinned SDK contracts for mobile/web clients.
+
+      Delete non-applicable template rows and sections. For every chosen surface,
+      name the owning contract, data path, permissions, tenant behavior, failure
+      semantics, and verification seam. Include sequence/state diagrams when
+      ordering, async execution, or cross-component ownership is material.
+
+      For external calls state the integration classification and transaction
+      split. For tasks state internal/external boundary, start mode, deduplication,
+      locking/concurrency, retry/backoff, time budget/checkpoint, evidence, and
+      operator surface. Do not hold a DB transaction across a provider call.
+
+      Record decisions with rejected alternatives. Open questions may contain
+      only facts that can be answered later without changing requirements,
+      architecture, or task decomposition.
+    requires:
+      - proposal
+      - specs
+
+  - id: verification
+    generates: verification.md
+    description: Pre-implementation quality gates and traceable verification plan
+    template: verification.md
+    instruction: |
+      Design independent evidence before implementation. Map every stable Trace ID
+      to at least one proof and identify the responsible reviewer or automated gate.
+
+      Cover the layers that actually apply: requirement review, registry/schema,
+      service/domain, API/SDK contract, admin UI, web/mobile client, task/integration,
+      migration/backfill, security/tenancy, observability/realtime, and end-to-end.
+
+      Distinguish:
+      - deterministic tests and static/architecture checks;
+      - contract fixtures or generated-client compatibility checks;
+      - independent human review or manual evidence;
+      - production/canary evidence and rollback signals.
+
+      Include failure, retry, duplicate, concurrency, authorization, tenant, stale
+      client, offline/reconnect, and provider-unavailable cases when relevant.
+      Do not mark review checkboxes on behalf of a reviewer. Unresolved blocking
+      findings must be fixed in proposal/specs/design before tasks are generated.
+    requires:
+      - specs
+      - design
+
+  - id: tasks
+    generates: tasks.md
+    description: Vertical implementation slices with trace IDs and verification per task
+    template: tasks.md
+    instruction: |
+      Break the approved design into small vertical slices that produce a
+      demonstrable or independently verifiable increment. Do not organize the
+      whole plan as horizontal database/backend/frontend phases when a tracer
+      slice can cross those layers safely.
+
+      Before writing tasks, inspect verification.md. If any blocking gate or
+      unresolved finding remains, stop and correct the upstream artifact.
+
+      Each task must:
+      - use `- [ ] N.M` checkbox syntax;
+      - cite the stable Trace IDs it implements or verifies;
+      - name the repository/package/surface when the change is multi-repo;
+      - state its dependency or `[P]` only when it is genuinely parallel;
+      - include an observable verification command or evidence.
+
+      Put contract/schema compatibility and tracer work early. Put rollout,
+      migration, rollback, production evidence, and documentation in the slice
+      where they become meaningful, not in an unowned final polish bucket.
+    requires:
+      - specs
+      - design
+      - verification
+
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md
+  instruction: |
+    Read proposal.md, the applicable capability specs, design.md,
+    verification.md, and tasks.md. Work one vertical slice at a time, run the
+    stated proof for each task, and mark it complete only after the proof passes.
+    Stop when a blocking review gate, architectural assumption, or contract
+    ambiguity is unresolved. graph-ba may ingest trace links as observed
+    evidence, but it does not control this lifecycle.
