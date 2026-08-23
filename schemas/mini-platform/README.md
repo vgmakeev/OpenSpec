@@ -7,14 +7,19 @@ packages.
 Its artifact graph is:
 
 ```text
-proposal -> specs -> design -> verification -> tasks -> apply
+proposal -> specs ─┐
+         -> design ├-> tasks -> apply
+                   ┘
 ```
 
-The important distinction is that scenarios support a requirement; they do not
-replace the system contract. Capability specs can express outcomes, invariants,
-states, interfaces, workflows, and quality constraints. The design then maps
-those durable guarantees to mini-native implementation boundaries, and the
-verification plan creates an independent gate before task generation.
+This is the standard OpenSpec artifact lifecycle and dependency graph. The
+schema intentionally customizes the capability spec template, not the flow.
+
+The important distinction in that template is that scenarios support a
+requirement; they do not replace the system contract. Capability specs can
+express outcomes, invariants, states, interfaces, workflows, and quality
+constraints. Requirement bodies may include structured state, contract,
+permission, delivery, compatibility, or limit tables before their scenarios.
 
 Stable Trace IDs (`AC`, `RULE`, `STATE`, `CONTRACT`, and `FLOW`) belong to the
 capability specs. graph-ba may index links from code/tests/evidence to those IDs,

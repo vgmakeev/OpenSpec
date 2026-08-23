@@ -42,24 +42,21 @@ describe('mini-platform packaged schema', () => {
     tempDir = undefined;
   });
 
-  it('defines the intended review-first artifact graph', () => {
+  it('preserves the standard OpenSpec artifact graph', () => {
     const schema = loadSchema(path.join(process.cwd(), 'schemas', 'mini-platform', 'schema.yaml'));
 
     expect(schema.artifacts.map((artifact) => artifact.id)).toEqual([
       'proposal',
       'specs',
       'design',
-      'verification',
       'tasks',
     ]);
-    expect(schema.artifacts.find((artifact) => artifact.id === 'verification')?.requires).toEqual([
-      'specs',
-      'design',
+    expect(schema.artifacts.find((artifact) => artifact.id === 'design')?.requires).toEqual([
+      'proposal',
     ]);
     expect(schema.artifacts.find((artifact) => artifact.id === 'tasks')?.requires).toEqual([
       'specs',
       'design',
-      'verification',
     ]);
     expect(schema.apply?.requires).toEqual(['tasks']);
     expect(schema.apply?.tracks).toBe('tasks.md');

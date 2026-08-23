@@ -1,52 +1,54 @@
 name: mini-platform
 version: 1
-description: Mini-native multi-surface workflow - proposal -> specs -> design -> verification -> tasks
-
+description: Standard OpenSpec workflow with a richer capability-spec template for mini systems
 artifacts:
   - id: proposal
     generates: proposal.md
-    description: Change intent, outcomes, scope, capabilities, surfaces, and impact
+    description: Initial proposal document outlining the change
     template: proposal.md
     instruction: |
-      Establish WHY the change is needed and draw its product/system boundary.
+      Create the proposal document that establishes WHY this change is needed.
 
-      Keep the proposal concise. It is a routing artifact, not a technical design.
-      It must:
-      - state the problem, desired outcomes, and measurable success;
-      - state in-scope and non-goals;
-      - name every new or modified capability spec;
-      - inventory affected product surfaces and runtime boundaries at a high level;
-      - identify affected repositories/packages and compatibility risk.
+      Sections:
+      - **Why**: 1-2 sentences on the problem or opportunity. What problem does this solve? Why now?
+      - **What Changes**: Bullet list of changes. Be specific about new capabilities, modifications, or removals. Mark breaking changes with **BREAKING**.
+      - **Capabilities**: Identify which specs will be created or modified:
+        - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<capability-path>/spec.md`. Use kebab-case for path segments you introduce (e.g., `user-auth` or `identity/user-auth`) and follow the project's existing spec organization.
+        - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Use the exact existing path under `openspec/specs/`. Leave empty if no requirement changes.
+      - **Impact**: Affected code, APIs, dependencies, or systems.
 
-      Surface choices may include registry CRUDL/admin, custom mini-admin,
-      generated SDK, web, mobile, service/CustomMethod, raw protocol adapter,
-      task, integration, event/realtime, CLI, or migration. Do not decide their
-      implementation here; the inventory prevents a backend-only view of a
-      multi-surface feature.
+      IMPORTANT: The Capabilities section is critical. It creates the contract between
+      proposal and specs phases. Research existing specs before filling this in.
+      Each capability listed here will need a corresponding spec file.
 
-      Capabilities are the contract between proposal and specs:
-      - New capabilities create `specs/<capability-path>/spec.md`.
-      - Modified capabilities use the exact existing path under
-        `openspec/specs/` and create a delta at the same relative path.
-      - Use kebab-case for new path segments.
-      - Pure refactors/tooling/docs changes may set `skip_specs: true` in the
-        change's `.openspec.yaml`; do not invent behavioral requirements.
+      Every change must either declare at least one capability (new or
+      modified) or explicitly opt out of specs: `openspec validate` rejects a
+      change with zero deltas unless the change's `.openspec.yaml` sets
+      `skip_specs: true`. Use `skip_specs: true` only when no spec-level
+      behavior changes (pure refactor, tooling, docs) - specs describe
+      behavior, so if behavior does not change, no spec should change either.
+      Do not invent a requirement just to satisfy validation.
+
+      Keep it concise (1-2 pages). Focus on the "why" not the "how" -
+      implementation details belong in design.md.
+
+      This is the foundation - specs, design, and tasks all build on this.
     requires: []
 
   - id: specs
     generates: "specs/**/*.md"
-    description: Durable capability contracts with outcomes, invariants, states, interfaces, workflows, quality constraints, and scenarios
+    description: Rich capability contracts for multi-surface mini systems
     template: spec.md
     instruction: |
-      Define WHAT the capability guarantees, independent of a particular code
-      layout. Scenarios are evidence for requirements, not the entire spec.
+      Create specification files that define WHAT the capability guarantees.
+      A spec is a durable behavior contract, not an implementation plan, and
+      scenarios are evidence for requirements rather than the entire spec.
 
-      Create one delta spec per capability listed in proposal.md. Preserve the
-      exact capability path. A rich requirement may describe one of these kinds:
-      - `outcome` - user/operator/downstream result;
-      - `invariant` - domain, authorization, tenancy, consistency, or safety rule;
-      - `state` - lifecycle, transition, guard, and side effect contract;
-      - `contract` - API, SDK, UI, event, file, or provider-visible boundary;
+      A requirement may express one of these semantic kinds:
+      - `outcome` - a user, operator, or downstream result;
+      - `invariant` - a domain, authorization, tenancy, consistency, or safety rule;
+      - `state` - lifecycle states, transitions, guards, and observable side effects;
+      - `contract` - an API, SDK, UI, event, file, or provider-visible boundary;
       - `workflow` - ordered behavior across components or time;
       - `quality` - performance, reliability, compatibility, privacy, or operability.
 
@@ -61,127 +63,137 @@ artifacts:
       - at least one `#### Scenario:` using WHEN/THEN, including failure and
         boundary cases when they change the contract.
 
+      Surface values may include `admin`, `web`, `mobile`, `api`, `sdk`,
+      `worker`, `integration`, and `cli`. They describe where the guarantee is
+      observable, not which source file will implement it. Avoid internal
+      classes/functions, framework choices, and implementation steps.
+
       Stable Trace IDs belong to the capability, not to the temporary change.
-      Reuse an existing ID when modifying its requirement. These IDs are the
-      only input graph-ba needs for optional trace projection; graph-ba does not
-      own proposal, review, apply, or archive lifecycle.
+      Reuse an existing ID when modifying its requirement. They can be indexed
+      by traceability tools, but do not add a second change lifecycle.
 
-      Delta operations use exact level-2 headings:
-      - `## ADDED Requirements`
-      - `## MODIFIED Requirements` (copy the complete existing requirement)
-      - `## REMOVED Requirements` (include Reason and Migration)
-      - `## RENAMED Requirements` (FROM/TO only)
+      Create one spec file per capability listed in the proposal's Capabilities section.
+      `<capability-path>` is the spec directory relative to `specs/` (for example,
+      `user-auth` or `identity/user-auth`). Preserve the full path:
+      - New capabilities: use the exact path from the proposal at `specs/<capability-path>/spec.md`. Any path segment newly introduced in the proposal must be kebab-case. Follow the project's existing organization; do not add a new domain level when the project uses a flat layout.
+      - Modified capabilities: use the exact existing path from `openspec/specs/<capability-path>/` when creating the delta at `specs/<capability-path>/spec.md`. Do not move or rename the capability.
 
-      New capabilities begin with `## Purpose` of at least 50 characters.
-      Existing capability deltas omit Purpose unless creating the capability.
-      Keep auxiliary system analysis in design.md: OpenSpec archives Purpose and
-      complete requirement blocks into living specs, while arbitrary sibling
-      sections are not a durable merge contract.
+      There must be at least one spec file unless the change's `.openspec.yaml`
+      sets `skip_specs: true` (no spec-level behavior change) - `openspec validate`
+      rejects a zero-delta change without that marker. If the proposal lists no
+      capabilities and `skip_specs` is not set, revisit the proposal first.
+
+      Delta operations (use ## headers):
+      - **ADDED Requirements**: New capabilities
+      - **MODIFIED Requirements**: Changed behavior - MUST include full updated content
+      - **REMOVED Requirements**: Deprecated features - MUST include **Reason** and **Migration**
+      - **RENAMED Requirements**: Name changes only - use FROM:/TO: format
+
+      Format requirements:
+      - Each requirement: `### Requirement: [<trace-id>] <name>` followed by its metadata and normative statement
+      - Use SHALL/MUST for normative requirements (avoid should/may)
+      - Each scenario: `#### Scenario: <name>` with WHEN/THEN format
+      - **CRITICAL**: Scenarios MUST use exactly 4 hashtags (`####`). Using 3 hashtags or bullets will fail silently.
+      - Every requirement MUST have at least one scenario.
+
+      New capabilities only: start the delta spec with a `## Purpose` section -
+      one or two sentences (50+ characters, or `openspec validate --strict`
+      reports it as too brief) describing what the capability is for. Archive
+      copies it into the main spec it creates; without it the new main spec is
+      left with a `TBD ... Update Purpose after archive` placeholder to fill in
+      by hand. Do NOT add `## Purpose` to a delta for an existing capability -
+      that spec already has one and the delta's is ignored. To change an
+      existing capability's Purpose - including a leftover `TBD` placeholder -
+      edit `<planningHome.root>/openspec/specs/<capability-path>/spec.md`
+      directly. `planningHome.root` comes from the `openspec instructions ...
+      --json` response. Always use it rather than a repo-relative path: it
+      resolves to the store whenever the change lives in one - whether that
+      came from `--store`, a project `store:` pointer, or a global default
+      store - and to the current repository otherwise. Do not try to work out
+      which case applies; the field already has.
+
+      MODIFIED requirements workflow:
+      1. Locate the existing requirement in `<planningHome.root>/openspec/specs/<capability-path>/spec.md` (the same store-aware root as above)
+      2. Copy the ENTIRE requirement block (from `### Requirement:` through all scenarios)
+      3. Paste under `## MODIFIED Requirements` and edit to reflect new behavior
+      4. Ensure header text, including its Trace ID, matches exactly (whitespace-insensitive)
+
+      Common pitfall: Using MODIFIED with partial content loses detail at archive time.
+      If adding new concerns without changing existing behavior, use ADDED instead.
+
+      Specs should be testable: each scenario is a candidate test, while the
+      normative statement and structured contract remain authoritative.
     requires:
       - proposal
 
   - id: design
     generates: design.md
-    description: Mini-native system design and multi-surface implementation projection
+    description: Technical design document with implementation details
     template: design.md
     instruction: |
-      Explain HOW the approved requirements map onto the system. The design is
-      required because mini applications may span registry state, generated
-      admin, custom admin, web/mobile SDK clients, services, tasks, integrations,
-      realtime delivery, and migrations.
+      Create the design document that explains HOW to implement the change.
 
-      Start with the smallest mini-native boundary:
-      1. registry Resource + CRUDL for persisted product/admin state;
-      2. ResourceRuntime.aggregate for counters, sums, and bucketed summaries;
-      3. service for invariants, calculations, FSM transitions, and multi-table writes;
-      4. CustomMethod for callable non-CRUDL commands/reads;
-      5. raw FastAPI only for webhooks/callbacks, files/streaming, multipart,
-         legacy facades, or custom protocols;
-      6. task for work that finishes outside the request;
-      7. External boundary plus connection/trigger for provider work or inbound events;
-      8. custom mini-admin only for workflow-heavy screens; ordinary management
-         remains registry-driven;
-      9. generated, version-pinned SDK contracts for mobile/web clients.
+      When to include design.md (create only if any apply):
+      - Cross-cutting change (multiple services/modules) or new architectural pattern
+      - New external dependency or significant data model changes
+      - Security, performance, or migration complexity
+      - Ambiguity that benefits from technical decisions before coding
 
-      Delete non-applicable template rows and sections. For every chosen surface,
-      name the owning contract, data path, permissions, tenant behavior, failure
-      semantics, and verification seam. Include sequence/state diagrams when
-      ordering, async execution, or cross-component ownership is material.
+      Sections:
+      - **Context**: Only the current state and constraints needed to explain the approach. Reference the proposal for motivation instead of restating it (e.g., "See proposal.md - Why").
+      - **Goals / Non-Goals**: What this design achieves and explicitly excludes. Don't restate the proposal's scope - add only design-level boundaries.
+      - **Decisions**: Key technical choices with rationale (why X over Y?). Include alternatives considered for each decision.
+      - **Risks / Trade-offs**: Known limitations, things that could go wrong. Format: [Risk] → Mitigation
+      - **Migration Plan**: Steps to deploy, rollback strategy (if applicable)
+      - **Open Questions**: Unknowns that can safely be answered later without
+        changing the specs, the approach, or the task breakdown. Omit if none.
 
-      For external calls state the integration classification and transaction
-      split. For tasks state internal/external boundary, start mode, deduplication,
-      locking/concurrency, retry/backoff, time budget/checkpoint, evidence, and
-      operator surface. Do not hold a DB transaction across a provider call.
+      Open questions are for genuinely deferrable unknowns, not decisions you
+      skipped. If a question would change the specs, the chosen approach, or
+      the task breakdown, resolve it now - ask the user instead of guessing.
 
-      Record decisions with rejected alternatives. Open questions may contain
-      only facts that can be answered later without changing requirements,
-      architecture, or task decomposition.
+      Focus on architecture and approach, not line-by-line implementation.
+      The proposal covers why and what; design covers how. Reference the
+      proposal for motivation and, once written, the specs for requirements -
+      if a section would only restate them, point to them instead.
+
+      Good design docs explain the "why" behind technical decisions.
     requires:
       - proposal
-      - specs
-
-  - id: verification
-    generates: verification.md
-    description: Pre-implementation quality gates and traceable verification plan
-    template: verification.md
-    instruction: |
-      Design independent evidence before implementation. Map every stable Trace ID
-      to at least one proof and identify the responsible reviewer or automated gate.
-
-      Cover the layers that actually apply: requirement review, registry/schema,
-      service/domain, API/SDK contract, admin UI, web/mobile client, task/integration,
-      migration/backfill, security/tenancy, observability/realtime, and end-to-end.
-
-      Distinguish:
-      - deterministic tests and static/architecture checks;
-      - contract fixtures or generated-client compatibility checks;
-      - independent human review or manual evidence;
-      - production/canary evidence and rollback signals.
-
-      Include failure, retry, duplicate, concurrency, authorization, tenant, stale
-      client, offline/reconnect, and provider-unavailable cases when relevant.
-      Do not mark review checkboxes on behalf of a reviewer. Unresolved blocking
-      findings must be fixed in proposal/specs/design before tasks are generated.
-    requires:
-      - specs
-      - design
 
   - id: tasks
     generates: tasks.md
-    description: Vertical implementation slices with trace IDs and verification per task
+    description: Implementation checklist with trackable tasks
     template: tasks.md
     instruction: |
-      Break the approved design into small vertical slices that produce a
-      demonstrable or independently verifiable increment. Do not organize the
-      whole plan as horizontal database/backend/frontend phases when a tracer
-      slice can cross those layers safely.
+      Create the task list that breaks down the implementation work.
 
-      Before writing tasks, inspect verification.md. If any blocking gate or
-      unresolved finding remains, stop and correct the upstream artifact.
+      Before writing tasks, check design.md for Open Questions. If any of them
+      would change what gets built, resolve them with the user first - do not
+      bake an unstated assumption into the task list.
 
-      Each task must:
-      - use `- [ ] N.M` checkbox syntax;
-      - cite the stable Trace IDs it implements or verifies;
-      - name the repository/package/surface when the change is multi-repo;
-      - state its dependency or `[P]` only when it is genuinely parallel;
-      - include an observable verification command or evidence.
+      **IMPORTANT: Follow the template below exactly.** The apply phase parses
+      checkbox format to track progress. Tasks not using `- [ ]` won't be tracked.
 
-      Put contract/schema compatibility and tracer work early. Put rollout,
-      migration, rollback, production evidence, and documentation in the slice
-      where they become meaningful, not in an unowned final polish bucket.
+      Guidelines:
+      - Group related tasks under ## numbered headings
+      - Each task MUST be a checkbox: `- [ ] X.Y Task description`
+      - Tasks should be small enough to complete in one session
+      - Order tasks by dependency (what must be done first?)
+      - Each task MUST state how to verify completion (a test, command,
+        observable behavior, or delivered artifact). Put the verification in
+        that task's checkbox description. Use a separate verification task only
+        when it checks broader integration or system behavior that spans
+        multiple implementation tasks.
+
+      Reference specs for what needs to be built, design for how to build it.
     requires:
       - specs
       - design
-      - verification
 
 apply:
-  requires:
-    - tasks
+  requires: [tasks]
   tracks: tasks.md
   instruction: |
-    Read proposal.md, the applicable capability specs, design.md,
-    verification.md, and tasks.md. Work one vertical slice at a time, run the
-    stated proof for each task, and mark it complete only after the proof passes.
-    Stop when a blocking review gate, architectural assumption, or contract
-    ambiguity is unresolved. graph-ba may ingest trace links as observed
-    evidence, but it does not control this lifecycle.
+    Read context files, work through pending tasks, mark complete as you go.
+    Pause if you hit blockers or need clarification.
