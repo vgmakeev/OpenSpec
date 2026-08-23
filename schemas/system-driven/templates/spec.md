@@ -10,7 +10,7 @@
 
 **Surfaces:** <!-- admin | web | mobile | api | sdk | worker | integration | cli -->
 
-**Owner:** <!-- product/domain owner, not a source file -->
+**Owner:** <!-- accountable product/domain owner, not a source file -->
 
 <!-- One normative SHALL/MUST statement. Add structured tables below when they clarify inputs/outputs/errors, state transitions, permissions, delivery, limits, or compatibility. -->
 

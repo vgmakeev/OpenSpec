@@ -2,6 +2,12 @@
 
 <!-- Explain the motivation for this change. What problem does this solve? Why now? -->
 
+## Desired Outcomes
+
+<!-- Observable user, operator, business, or system outcomes and their success signals. -->
+
+- **O1:** <!-- outcome and success signal -->
+
 ## What Changes
 
 <!-- Describe what will change. Be specific about new capabilities, modifications, or removals. -->
@@ -24,6 +30,17 @@
      satisfy validation. -->
 - `<existing-capability-path>`: <what requirement is changing>
 
+## Scope
+
+### In Scope
+
+- <!-- behavior or surface included -->
+
+### Non-Goals
+
+- <!-- likely scope expansion explicitly excluded -->
+
 ## Impact
 
-<!-- Affected code, APIs, dependencies, systems -->
+<!-- Affected repositories/packages, data, APIs/SDKs, admin/web/mobile surfaces,
+     tasks/integrations, operators, rollout, dependencies, and blast radius. -->
