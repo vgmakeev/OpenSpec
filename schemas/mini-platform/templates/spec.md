@@ -6,7 +6,7 @@
 
 ### Requirement: [AC-<capability>-001] <!-- concise requirement name -->
 
-**Kind:** outcome
+**Kind:** acceptance
 
 **Surfaces:** <!-- admin | web | mobile | api | sdk | worker | integration | cli -->
 
@@ -20,6 +20,7 @@
 - **THEN** <!-- observable result -->
 - **AND** <!-- optional additional invariant/evidence -->
 
-<!-- Add more requirement blocks as needed. Use stable prefixes:
-     AC observable outcome; RULE invariant/quality constraint; STATE lifecycle;
-     CONTRACT API/UI/SDK/event/file boundary; FLOW multi-step orchestration. -->
+<!-- Add invariant, state, contract, workflow, and quality requirement blocks as
+     needed. They do not need IDs merely for graph tooling. Use a stable AC ID
+     when tests, repositories, releases, or external documents need to cite an
+     acceptance criterion. -->

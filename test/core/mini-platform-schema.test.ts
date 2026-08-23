@@ -12,7 +12,7 @@ const RICH_DELTA = [
   '',
   '## ADDED Requirements',
   '',
-  '### Requirement: [CONTRACT-orders-cancel-v1] Cancel order command',
+  '### Requirement: Cancel order command',
   '',
   '**Kind:** contract',
   '',
@@ -60,6 +60,12 @@ describe('mini-platform packaged schema', () => {
     ]);
     expect(schema.apply?.requires).toEqual(['tasks']);
     expect(schema.apply?.tracks).toBe('tasks.md');
+    expect(schema.artifacts.find((artifact) => artifact.id === 'tasks')?.instruction).toContain(
+      'uv run mini registry-context lint <target> --lint-enable --lint-level enforce --json'
+    );
+    expect(schema.artifacts.find((artifact) => artifact.id === 'specs')?.instruction).not.toContain(
+      'graph-ba'
+    );
   });
 
   it('preserves rich requirement metadata and contract tables when applying a delta', async () => {
@@ -74,9 +80,7 @@ describe('mini-platform packaged schema', () => {
     const result = await buildUpdatedSpec(update, 'cancel-order', { silent: true });
 
     expect(result.counts.added).toBe(1);
-    expect(result.rebuilt).toContain(
-      '### Requirement: [CONTRACT-orders-cancel-v1] Cancel order command'
-    );
+    expect(result.rebuilt).toContain('### Requirement: Cancel order command');
     expect(result.rebuilt).toContain('**Surfaces:** api, sdk, admin, mobile');
     expect(result.rebuilt).toContain('| cancellable order | accepted result | — |');
     expect(result.rebuilt).toContain('#### Scenario: Terminal order is rejected');
