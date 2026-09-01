@@ -2,11 +2,13 @@
 
 <!-- New capability only: at least 50 characters. Delete for an existing capability. -->
 
-## Feature Context
+## Capability Context
 
 **Delivery mode:** <!-- new | existing | mixed -->
 
-**Feature/screen scope:** <!-- user journey and affected Flutter screens -->
+**Scope kind:** <!-- feature | screen | shared app contract | platform policy -->
+
+**Capability scope:** <!-- user journey, affected screens, or cross-feature responsibility and consumers -->
 
 <!-- Keep only durable product meaning that must survive implementation changes.
      Button movement, visual polish, obvious copy fixes, and internal refactors
@@ -32,7 +34,7 @@
      and accessibility behavior reused unchanged. Do not restate or retest it
      unless this feature changes or configures it. -->
 
-## Feature Coverage
+## Capability Coverage
 
 | Concern | Requirement(s) or N/A | What needs human confirmation |
 |---|---|---|

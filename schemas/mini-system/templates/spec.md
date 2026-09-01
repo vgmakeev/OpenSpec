@@ -3,11 +3,13 @@
 <!-- New capability only: describe its durable product responsibility in at
      least 50 characters. Delete this section for an existing capability. -->
 
-## Feature Context
+## Capability Context
 
 **Delivery mode:** <!-- new | existing | mixed -->
 
-**Feature/screen scope:** <!-- user-visible boundary -->
+**Scope kind:** <!-- feature | screen | shared product contract | platform policy -->
+
+**Capability scope:** <!-- user-visible boundary or cross-feature responsibility and consumers -->
 
 <!-- Keep only durable product meaning that must survive implementation changes.
      Button movement, visual polish, obvious copy fixes, and internal refactors
@@ -34,7 +36,7 @@
      and design-system behavior reused unchanged. Do not restate or retest it
      unless this feature changes or configures it. -->
 
-## Feature Coverage
+## Capability Coverage
 
 <!-- Keep every row. Mark N/A deliberately and link applicable rows to the
      Requirement blocks below. This is a completeness map; only normative
@@ -57,7 +59,8 @@
 <!-- The agent MUST leave the verdict PENDING. This is a blitz review: the
      human confirms/corrects decision tables, checks that the key journeys are
      adequate and complete, and resolves explicit conflicts/questions. Nominal
-     read display and simple operations need only a quick sanity scan. -->
+     read display and simple operations need only a quick sanity scan. Shared
+     contracts may mark UI and feature-level journeys N/A. -->
 
 **Reviewer role:** <!-- analyst | product owner | assigned product reviewer -->
 
@@ -101,10 +104,10 @@
      - external: only feature-specific timeout/pending/retry/unavailable outcomes;
      - state: domain transitions and observable screen states;
      - realtime: event, invalidation/refetch rule and visible UI result;
-     - journey: one of roughly 3-7 key feature-level paths;
+     - journey: one of roughly 3-7 key paths when this capability has journeys;
      - other: permissions, privacy, limits, time, concurrency, accessibility,
        localization, analytics, compatibility, offline/deep links, or rollout,
-       but only when this feature changes them.
+       but only when this capability changes them.
 
      Product behavior belongs here. Decision tables are the requirements form
      for pure business logic. Their implementation as frontend/backend pure
@@ -119,4 +122,4 @@
 
 <!-- Add only necessary requirement blocks. Every requirement needs at least
      one scenario, but do not repeat every decision-table row as a scenario.
-     Keep feature-level end-to-end journeys few and meaningful. -->
+     Keep end-to-end journeys few and meaningful. -->
