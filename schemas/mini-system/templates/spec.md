@@ -9,6 +9,10 @@
 
 **Feature/screen scope:** <!-- user-visible boundary -->
 
+<!-- Keep only durable product meaning that must survive implementation changes.
+     Button movement, visual polish, obvious copy fixes, and internal refactors
+     without contract impact belong directly in code, not in this spec. -->
+
 ### Sources
 
 <!-- Use product/human inputs for meaning. For existing features, list legacy
@@ -39,6 +43,7 @@
 | Concern | Requirement(s) or N/A | What needs human confirmation |
 |---|---|---|
 | Read data: sources, filters, sorting, aggregation, calculated values, formatting | | |
+| UI semantics: feature-specific visible/available behavior or project-policy exception | | |
 | Pure business logic: decision tables for branching rules and calculations | | |
 | Business operations beyond ordinary CRUDL | | |
 | External interactions and visible failure/pending behavior | | |
@@ -76,7 +81,7 @@
 
 **Kind:** <!-- acceptance | invariant | state | contract | workflow | quality -->
 
-**Concern:** <!-- read | decision | operation | external | state | realtime | journey | other -->
+**Concern:** <!-- read | ui | decision | operation | external | state | realtime | journey | other -->
 
 **Surfaces:** <!-- mini-admin | web | flutter | api | sdk | worker | integration | cli -->
 
@@ -88,6 +93,9 @@
      remove ambiguity:
 
      - read: data source, filters/sorts/aggregates, calculation and format;
+     - ui: only feature-specific information/actions, visibility/availability,
+       feedback/navigation or an exception to project UI policy; omit coordinates,
+       spacing and component styling;
      - decision: explicit decision table with feasible rows and boundaries;
      - operation: preconditions, result, state effect and stable errors;
      - external: only feature-specific timeout/pending/retry/unavailable outcomes;

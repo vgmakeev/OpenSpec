@@ -8,6 +8,10 @@
 
 **Feature/screen scope:** <!-- user journey and affected Flutter screens -->
 
+<!-- Keep only durable product meaning that must survive implementation changes.
+     Button movement, visual polish, obvious copy fixes, and internal refactors
+     without contract impact belong directly in code, not in this spec. -->
+
 ### Sources
 
 <!-- Separate human/product inputs, Figma, legacy AC, and observed app/tests.
@@ -33,6 +37,7 @@
 | Concern | Requirement(s) or N/A | What needs human confirmation |
 |---|---|---|
 | Read data: API/local sources, filters, sorting, aggregation, calculated values, formatting | | |
+| UI semantics: feature-specific visible/available behavior or project-policy exception | | |
 | Pure business logic: decision tables for branching rules and calculations | | |
 | Business operations beyond ordinary API CRUD | | |
 | External/API interactions and visible timeout/offline/pending behavior | | |
@@ -69,7 +74,7 @@
 
 **Kind:** <!-- acceptance | invariant | state | contract | workflow | quality -->
 
-**Concern:** <!-- read | decision | operation | external | state | realtime | journey | other -->
+**Concern:** <!-- read | ui | decision | operation | external | state | realtime | journey | other -->
 
 **Surfaces:** <!-- android | ios | web | desktop | ui | api | storage | sync | platform -->
 
@@ -78,9 +83,11 @@
 **Source:** <!-- source link/ID; invented meaning is [ASSUMPTION] plus an open question -->
 
 <!-- Write one normative SHALL/MUST statement. Add only the structure that
-     removes ambiguity: read mapping/format; decision table; operation contract;
-     visible API/offline failure; domain/app state; realtime/push/sync refresh;
-     or one of roughly 3-7 key journeys.
+     removes ambiguity: read mapping/format; feature-specific information and
+     actions; availability or project-policy exceptions; feedback/navigation; decision
+     table; operation contract; visible API/offline failure; domain/app state;
+     realtime/push/sync refresh; or one of roughly 3-7 key journeys. Omit
+     coordinates, spacing and widget styling.
 
      Product behavior belongs here. Decision tables are the requirements form
      for pure business logic. Pure Dart placement plus unit tests, widgets,

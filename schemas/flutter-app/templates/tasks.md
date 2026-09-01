@@ -15,3 +15,23 @@
 - [ ] 3.3 <!-- Run focused unit/widget/integration/golden tests as applicable -->
 - [ ] 3.4 <!-- Run `flutter analyze` and the project's formatter/lint command -->
 - [ ] 3.5 <!-- Keep only affected checks: platform build, API/storage compatibility, accessibility, localization, analytics, rollout/rollback, documentation -->
+
+## 4. Implementation Validation
+
+<!-- One row per in-scope AC. Record actual commands, reports or manual observations. -->
+
+| AC | Required evidence | Actual result/reference |
+|---|---|---|
+| <!-- AC-ID --> | <!-- unit / widget / integration / manual / provider --> | <!-- PENDING until executed --> |
+
+### Human Implementation Review
+
+**Reviewer role:** <!-- analyst, product reviewer, designer, or assigned acceptance role -->
+
+**Reviewer:**
+
+**Reviewed at:**
+
+**Implementation revision:** <!-- Git commit reviewed -->
+
+**Verdict:** PENDING <!-- APPROVED | CHANGES_REQUESTED -->
