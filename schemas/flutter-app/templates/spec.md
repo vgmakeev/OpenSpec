@@ -47,7 +47,13 @@
      tables, checks the small set of key journeys, and resolves explicit
      questions. Nominal read rendering and simple operations need only a scan. -->
 
+**Reviewer role:** <!-- analyst | product owner | assigned product reviewer -->
+
 **Reviewer:** <!-- human name -->
+
+**Reviewed at:** <!-- ISO date/time; human-owned -->
+
+**Reviewed revision:** <!-- Git commit containing the exact reviewed requirement text -->
 
 **Verdict:** PENDING <!-- APPROVED | CHANGES_REQUESTED; human-owned -->
 

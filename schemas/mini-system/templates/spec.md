@@ -54,7 +54,13 @@
      adequate and complete, and resolves explicit conflicts/questions. Nominal
      read display and simple operations need only a quick sanity scan. -->
 
+**Reviewer role:** <!-- analyst | product owner | assigned product reviewer -->
+
 **Reviewer:** <!-- human name -->
+
+**Reviewed at:** <!-- ISO date/time; human-owned -->
+
+**Reviewed revision:** <!-- Git commit containing the exact reviewed requirement text -->
 
 **Verdict:** PENDING <!-- APPROVED | CHANGES_REQUESTED; human-owned -->
 
