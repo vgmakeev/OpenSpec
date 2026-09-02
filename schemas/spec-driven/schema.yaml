@@ -57,8 +57,9 @@ artifacts:
       diagram, operation contract, displayed-data rule, observable
       external-failure behavior, or observable interface-update behavior.
       These are optional forms, not mandatory sections or separate requirement
-      types. Do not invent nominal rules to cover the list. Technical mini
-      mappings belong in design.md.
+      types. Label them with bold text, not level-4 headings: OpenSpec reserves
+      `####` headings for Scenarios. Do not invent nominal rules to cover the
+      list. Technical mini mappings belong in design.md.
 
       Good spec content:
       - Observable behavior users or downstream systems rely on
