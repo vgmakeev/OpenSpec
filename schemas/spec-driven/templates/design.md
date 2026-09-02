@@ -1,19 +1,36 @@
 ## Context
 
-<!-- Current state and constraints that shape the approach. See proposal.md for motivation - don't restate it -->
+[Перед сохранением замените все подсказки в квадратных скобках и удалите
+неприменимый текст. Опишите текущее состояние и ограничения, влияющие на
+решение. Не повторяйте мотивацию из `proposal.md` и наблюдаемое поведение из
+specs.]
 
 ## Goals / Non-Goals
 
 **Goals:**
-<!-- What this design aims to achieve -->
+
+[Что должен обеспечить технический дизайн.]
 
 **Non-Goals:**
-<!-- What is explicitly out of scope -->
+
+[Что явно не входит в техническое решение.]
 
 ## Decisions
 
-<!-- Key design decisions with rationale and alternatives considered -->
+[Опишите только существенные решения и применимые способы реализации на mini:
+
+- Resource/registry;
+- CRUDL или `aggregate`;
+- чистое frontend-вычисление;
+- `CustomMethod` и owning service;
+- `task`/integration;
+- FSM;
+- SSE, invalidation и refetch.
+
+Не составляйте общий каталог сущностей и registries: фиксируйте только то, что
+нужно для реализации требований этого change. Mermaid приветствуется для
+нетривиальных потоков, последовательностей и состояний.]
 
 ## Risks / Trade-offs
 
-<!-- Known risks and trade-offs -->
+[Известные риски и компромиссы.]

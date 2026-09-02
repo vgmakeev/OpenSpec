@@ -44,35 +44,14 @@ artifacts:
 
       A spec is a behavior contract, not an implementation plan.
 
-      Before writing requirements, examine every applicable view of the
-      capability:
-      - displayed/read data: sources and meaning, filtering, sorting,
-        aggregation, derived values, and presentation rules;
-      - decision rules: use a decision table when the outcome depends on a
-        combination of inputs or conditions;
-      - operations: availability, preconditions, permissions, result, and
-        significant errors;
-      - external interactions: observable behavior during provider errors,
-        unavailability, waiting, and retries;
-      - states: domain states and transitions plus significant screen states;
-      - interface updates: what the user observes after background or realtime
-        changes;
-      - end-to-end journeys: a small set of paths from user action through data
-        change to the visible result.
-
-      For admin, web, and mobile capabilities, apply these views regardless of
-      the UI framework. For APIs, workers, and integrations, translate them
-      into the corresponding observable contracts. Add one or more atomic
-      Requirement blocks for every applicable view. Do not substitute a
-      coverage table for the normative requirements. Do not add empty sections
-      or N/A placeholders for views that are genuinely unchanged or
-      inapplicable.
-
-      One Requirement defines one independently reviewable rule, not an entire
-      screen or feature area. Split unrelated behavior into separate
-      requirements; a decision table may keep the branches of one rule
-      together. Scenarios illustrate key paths and material boundaries rather
-      than repeating every row of a decision table.
+      Keep Requirements atomic: one independently reviewable rule per
+      Requirement, and at least one Scenario for every Requirement as required
+      by OpenSpec. In addition to the normative statement and Scenario, use
+      only the forms that clarify the rule: a decision table, state-transition
+      table or diagram, operation contract, displayed-data rule, observable
+      external-failure behavior, or observable interface-update behavior.
+      These are optional forms, not mandatory sections or separate requirement
+      types. Technical mini mappings belong in design.md.
 
       Good spec content:
       - Observable behavior users or downstream systems rely on
@@ -194,6 +173,13 @@ artifacts:
       The proposal covers why and what; design covers how. Reference the
       proposal for motivation and, once written, the specs for requirements -
       if a section would only restate them, point to them instead.
+
+      For mini-based implementation, cover only the applicable mappings:
+      Resource/registry; CRUDL or aggregate; pure frontend derivation;
+      CustomMethod and owning service; task/integration; FSM; SSE,
+      invalidation, and refetch. Do not create a general inventory of entities
+      or registries. Mermaid is welcome when it makes a non-trivial flow,
+      sequence, or state model easier to understand.
 
       Good design docs explain the "why" behind technical decisions.
     requires:
