@@ -46,9 +46,11 @@ artifacts:
 
       Keep Requirements atomic: one independently reviewable rule per
       Requirement, and at least one Scenario for every Requirement as required
-      by OpenSpec. In addition to the normative statement and Scenario, use
-      only the forms that clarify the rule: a decision table, state-transition
-      table or diagram, operation contract, displayed-data rule, observable
+      by OpenSpec. Prefix every Requirement name with a stable `AC-NNN` ID that
+      is unique within its capability; never renumber or reuse existing IDs.
+      In addition to the normative statement and Scenario, use only the forms
+      that clarify the rule: a decision table, state-transition table or
+      diagram, operation contract, displayed-data rule, observable
       external-failure behavior, or observable interface-update behavior.
       These are optional forms, not mandatory sections or separate requirement
       types. Do not invent nominal rules to cover the list. Technical mini
