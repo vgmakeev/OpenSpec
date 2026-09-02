@@ -46,9 +46,15 @@ artifacts:
 
       Keep Requirements atomic: one independently reviewable rule per
       Requirement, and at least one Scenario for every Requirement as required
-      by OpenSpec. In addition to the normative statement and Scenario, use
-      only the forms that clarify the rule: a decision table, state-transition
-      table or diagram, operation contract, displayed-data rule, observable
+      by OpenSpec. If the project defines Requirement IDs, keep each ID unique
+      and persistent: preserve it in MODIFIED requirements, never renumber or
+      reuse it, and do not encode temporary document status or representation
+      form in it. Keep source identifiers as provenance. Do not invent an ID
+      namespace when the project defines none.
+
+      In addition to the normative statement and Scenario, use only the forms
+      that clarify the rule: a decision table, state-transition table or
+      diagram, operation contract, displayed-data rule, observable
       external-failure behavior, or observable interface-update behavior.
       These are optional forms, not mandatory sections or separate requirement
       types. Do not invent nominal rules to cover the list. Technical mini
