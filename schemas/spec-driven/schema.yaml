@@ -53,9 +53,10 @@ artifacts:
       namespace when the project defines none.
 
       In addition to the normative statement and Scenario, use only the forms
-      that clarify the rule: a decision table, state-transition table or
-      diagram, operation contract, displayed-data rule, observable
-      external-failure behavior, or observable interface-update behavior.
+      that clarify the rule: a formula or invariant, classifier,
+      mapping/permission matrix, decision table, state-transition table or
+      diagram, operation contract, displayed-data rule, observable external-
+      failure behavior, or observable interface-update behavior.
       These are optional forms, not mandatory sections or separate requirement
       types. Use the name "decision table" for a rule-based algorithm where
       conditions or their combinations select outcomes or actions and rows
@@ -65,9 +66,10 @@ artifacts:
       Use a formula, invariant, classifier, mapping/permission matrix,
       state-transition table, or operation contract when that notation fits
       better. A pure implementation does not by itself make a rule a decision
-      table. Label these forms with bold text, not level-4 headings: OpenSpec
-      reserves `####` headings for Scenarios. Do not invent nominal rules to
-      cover the list. Technical mini mappings belong in design.md.
+      table. Place applicable forms inside the corresponding Requirement before
+      its Scenarios and label them with bold text, not level-4 headings:
+      OpenSpec reserves `####` headings for Scenarios. Do not invent nominal
+      rules to cover the list. Technical mini mappings belong in design.md.
 
       Good spec content:
       - Observable behavior users or downstream systems rely on
