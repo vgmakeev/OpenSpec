@@ -183,11 +183,13 @@ artifacts:
       if a section would only restate them, point to them instead.
 
       For mini-based implementation, cover only the applicable mappings:
-      Resource/registry; CRUDL or aggregate; pure frontend derivation;
-      CustomMethod and owning service; task/integration; FSM; SSE,
-      invalidation, and refetch. Do not create a general inventory of entities
-      or registries. Mermaid is welcome when it makes a non-trivial flow,
-      sequence, or state model easier to understand.
+      Resource/registry; CRUDL or aggregate; pure derivation or decision logic
+      wherever a rule can be separated from I/O and state, including explicit
+      inputs, outputs, and a unit-test seam; CustomMethod and owning service;
+      task/integration; FSM; SSE, invalidation, and refetch. Do not create a
+      general inventory of entities or registries. Use an appropriate Mermaid
+      diagram when it makes non-trivial interactions, flows, sequences, or
+      state models easier to understand; diagrams are not mandatory.
 
       Good design docs explain the "why" behind technical decisions.
     requires:
