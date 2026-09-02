@@ -21,8 +21,10 @@ specs.]
 
 - Resource/registry;
 - CRUDL или `aggregate`;
-- чистое вычисление или decision logic везде, где правило можно отделить от I/O
-  и состояния, с явными входами, выходами и границей unit-теста;
+- чистые business rules и decision seams везде, где правило можно отделить от
+  I/O и состояния: укажите точную форму — формула, инвариант, merge, selector,
+  reducer, classifier или настоящая decision table — а также явные входы,
+  выходы и границу unit-теста;
 - `CustomMethod` и owning service;
 - `task`/integration;
 - FSM;

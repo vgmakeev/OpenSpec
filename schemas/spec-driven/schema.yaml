@@ -57,9 +57,17 @@ artifacts:
       diagram, operation contract, displayed-data rule, observable
       external-failure behavior, or observable interface-update behavior.
       These are optional forms, not mandatory sections or separate requirement
-      types. Label them with bold text, not level-4 headings: OpenSpec reserves
-      `####` headings for Scenarios. Do not invent nominal rules to cover the
-      list. Technical mini mappings belong in design.md.
+      types. Use the name "decision table" for a rule-based algorithm where
+      conditions or their combinations select outcomes or actions and rows
+      make branching, completeness, or priority clearer than prose. A genuine
+      decision table identifies conditions, outcomes, and relevant rules, plus
+      ordering or a hit policy, defaults, and infeasible cases when applicable.
+      Use a formula, invariant, classifier, mapping/permission matrix,
+      state-transition table, or operation contract when that notation fits
+      better. A pure implementation does not by itself make a rule a decision
+      table. Label these forms with bold text, not level-4 headings: OpenSpec
+      reserves `####` headings for Scenarios. Do not invent nominal rules to
+      cover the list. Technical mini mappings belong in design.md.
 
       Good spec content:
       - Observable behavior users or downstream systems rely on
@@ -183,10 +191,12 @@ artifacts:
       if a section would only restate them, point to them instead.
 
       For mini-based implementation, cover only the applicable mappings:
-      Resource/registry; CRUDL or aggregate; pure derivation or decision logic
-      wherever a rule can be separated from I/O and state, including explicit
-      inputs, outputs, and a unit-test seam; CustomMethod and owning service;
-      task/integration; FSM; SSE, invalidation, and refetch. Do not create a
+      Resource/registry; CRUDL or aggregate; pure business rules and decision
+      seams wherever a rule can be separated from I/O and state. Name the
+      actual form - formula, invariant, merge, selector, reducer, classifier,
+      or genuine decision table - and include explicit inputs, outputs, and a
+      unit-test seam. Cover CustomMethod and owning service; task/integration;
+      FSM; SSE, invalidation, and refetch only when applicable. Do not create a
       general inventory of entities or registries. Use an appropriate Mermaid
       diagram when it makes non-trivial interactions, flows, sequences, or
       state models easier to understand; diagrams are not mandatory.
