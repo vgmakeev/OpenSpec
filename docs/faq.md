@@ -50,7 +50,7 @@ Both are files OpenSpec writes so your assistant can run the workflow. Skills (`
 
 ### Where should I start if I'm not sure what to build?
 
-With `/opsx:explore`. It's a no-stakes thinking partner that reads your codebase, lays out options, and turns a fuzzy problem into a concrete plan, all before any change or code exists. It's in the default profile, so it's always available. When the plan is clear, it hands off to `/opsx:propose`. This is the single best habit to form, because it stops an eager AI from confidently building the wrong thing. See [Explore First](explore.md).
+With `/opsx:explore`. It's a no-stakes thinking partner that reads your codebase, lays out options, and turns a fuzzy problem into a concrete plan, all before any code gets written. It's in the default profile, so it's always available. When the plan is clear, it hands off to `/opsx:propose`. This is the single best habit to form, because it stops an eager AI from confidently building the wrong thing. See [Explore First](explore.md).
 
 ### What's the simplest possible flow?
 
@@ -152,4 +152,4 @@ There's no uninstall command, because it's just a global package plus files in y
 
 ### These docs are wrong or confusing. What do I do?
 
-Tell us, or fix it. Documentation PRs are welcome and valued. Open an issue or send a pull request.
+Tell us. Open a [docs issue](https://github.com/Fission-AI/OpenSpec/issues/new?template=docs.yml) with the page and what is wrong — doc fixes are some of the most useful reports we get.

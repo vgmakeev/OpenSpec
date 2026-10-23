@@ -1,10 +1,12 @@
-import { execSync, execFileSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { createRequire } from 'module';
 import os from 'os';
 
 const require = createRequire(import.meta.url);
 const MAX_TITLE_LENGTH = 72;
 const TITLE_PREFIX = 'Feedback: ';
+const REPRO_PROMPT =
+  '_Not provided — filed with `openspec feedback`. If this is a bug, please add the shortest steps that reproduce it from a fresh project._';
 
 /**
  * Check if gh CLI is installed and available in PATH
@@ -12,8 +14,10 @@ const TITLE_PREFIX = 'Feedback: ';
  */
 function isGhInstalled(): boolean {
   try {
-    const command = process.platform === 'win32' ? 'where gh' : 'which gh';
-    execSync(command, { stdio: 'pipe' });
+    // execFileSync, not execSync: no shell is needed to look a binary up, and
+    // spawning one next to free-form issue text is the shape a future refactor
+    // most easily turns into command injection.
+    execFileSync(process.platform === 'win32' ? 'where' : 'which', ['gh'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -25,7 +29,7 @@ function isGhInstalled(): boolean {
  */
 function isGhAuthenticated(): boolean {
   try {
-    execSync('gh auth status', { stdio: 'pipe' });
+    execFileSync('gh', ['auth', 'status'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -108,14 +112,20 @@ function formatTitle(message: string): string {
 
 /**
  * Format the full feedback body
+ *
+ * The headings mirror the bug form's labels (.github/ISSUE_TEMPLATE/bug_report.yml)
+ * so a CLI-filed issue reads like one filed through the form. `gh issue create
+ * --body` cannot fill an issue form, so the repro prompt is spelled out instead
+ * of being left silently empty.
  */
 function formatBody(message: string, bodyText?: string): string {
-  const parts = ['## Summary', '', message];
+  const parts = ['### What happened', '', message];
 
   if (bodyText) {
-    parts.push('', '## Details', '', bodyText);
+    parts.push('', '### Details', '', bodyText);
   }
 
+  parts.push('', '### Minimal steps to reproduce', '', REPRO_PROMPT);
   parts.push('', generateMetadata());
 
   return parts.join('\n');
@@ -123,14 +133,21 @@ function formatBody(message: string, bodyText?: string): string {
 
 /**
  * Generate a pre-filled GitHub issue URL for manual submission
+ *
+ * Opens the bug form itself. The query keys are the form's own field ids, which
+ * is how GitHub prefills an issue form; the fields it leaves empty are the
+ * required ones only the reporter can answer.
  */
-function generateManualSubmissionUrl(title: string, body: string): string {
-  const repo = 'Fission-AI/OpenSpec';
-  const encodedTitle = encodeURIComponent(title);
-  const encodedBody = encodeURIComponent(body);
-  const encodedLabels = encodeURIComponent('feedback');
+function generateManualSubmissionUrl(title: string, message: string, bodyText?: string): string {
+  const params = new URLSearchParams({
+    template: 'bug_report.yml',
+    title,
+    what_happened: bodyText ? `${message}\n\n${bodyText}` : message,
+    version: getVersion(),
+    environment: `${getPlatform()}, Node ${process.version}`,
+  });
 
-  return `https://github.com/${repo}/issues/new?title=${encodedTitle}&body=${encodedBody}&labels=${encodedLabels}`;
+  return `https://github.com/Fission-AI/OpenSpec/issues/new?${params.toString()}`;
 }
 
 /**
@@ -164,7 +181,7 @@ function isMissingLabelError(error: any): boolean {
  * network, rate limit, ...), so show the same manual-submission path the
  * missing-gh and unauthenticated flows get instead of discarding the text.
  */
-function reportGhFailure(error: any, title: string, body: string): void {
+function reportGhFailure(error: any, title: string, body: string, url: string): void {
   // Display the error output from gh CLI
   if (error.stderr) {
     console.error(error.stderr.toString());
@@ -174,9 +191,8 @@ function reportGhFailure(error: any, title: string, body: string): void {
 
   displayFormattedFeedback(title, body);
 
-  const manualUrl = generateManualSubmissionUrl(title, body);
   console.log('Please submit your feedback manually:');
-  console.log(manualUrl);
+  console.log(url);
 
   // Exit with the same code as gh CLI
   process.exit(error.status ?? 1);
@@ -210,7 +226,7 @@ function createIssue(title: string, body: string, labels: string[]): string {
 /**
  * Submit feedback via gh CLI
  */
-function submitViaGhCli(title: string, body: string): void {
+function submitViaGhCli(title: string, body: string, url: string): void {
   let issueUrl: string;
   let labelApplied = true;
 
@@ -218,7 +234,7 @@ function submitViaGhCli(title: string, body: string): void {
     issueUrl = createIssue(title, body, ['feedback']);
   } catch (error: any) {
     if (!isMissingLabelError(error)) {
-      reportGhFailure(error, title, body);
+      reportGhFailure(error, title, body, url);
       return;
     }
 
@@ -228,7 +244,7 @@ function submitViaGhCli(title: string, body: string): void {
       issueUrl = createIssue(title, body, []);
       labelApplied = false;
     } catch (retryError: any) {
-      reportGhFailure(retryError, title, body);
+      reportGhFailure(retryError, title, body, url);
       return;
     }
   }
@@ -246,7 +262,12 @@ function submitViaGhCli(title: string, body: string): void {
 /**
  * Handle fallback when gh CLI is not available or not authenticated
  */
-function handleFallback(title: string, body: string, reason: 'missing' | 'unauthenticated'): void {
+function handleFallback(
+  title: string,
+  body: string,
+  url: string,
+  reason: 'missing' | 'unauthenticated'
+): void {
   if (reason === 'missing') {
     console.log('⚠️  GitHub CLI not found. Manual submission required.');
   } else {
@@ -255,9 +276,8 @@ function handleFallback(title: string, body: string, reason: 'missing' | 'unauth
 
   displayFormattedFeedback(title, body);
 
-  const manualUrl = generateManualSubmissionUrl(title, body);
   console.log('Please submit your feedback manually:');
-  console.log(manualUrl);
+  console.log(url);
 
   if (reason === 'unauthenticated') {
     console.log('\nTo auto-submit in the future: gh auth login');
@@ -275,20 +295,21 @@ export class FeedbackCommand {
     // Format title and body once for all code paths
     const title = formatTitle(message);
     const body = formatBody(message, options?.body);
+    const url = generateManualSubmissionUrl(title, message, options?.body);
 
     // Check if gh CLI is installed
     if (!isGhInstalled()) {
-      handleFallback(title, body, 'missing');
+      handleFallback(title, body, url, 'missing');
       return;
     }
 
     // Check if gh CLI is authenticated
     if (!isGhAuthenticated()) {
-      handleFallback(title, body, 'unauthenticated');
+      handleFallback(title, body, url, 'unauthenticated');
       return;
     }
 
     // Submit via gh CLI
-    submitViaGhCli(title, body);
+    submitViaGhCli(title, body, url);
   }
 }

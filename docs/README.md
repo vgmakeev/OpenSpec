@@ -1,5 +1,8 @@
 # OpenSpec Documentation
 
+> [!WARNING]
+> These pages are legacy and some are out of date. The current docs are at **[openspec.dev/docs](https://openspec.dev/docs)** (source: [`docs-lab/`](../docs-lab/)).
+
 Welcome. This is the home for everything OpenSpec.
 
 OpenSpec helps you and your AI coding assistant **agree on what to build before any code is written.** You describe the change, the AI drafts a short spec and a task list, you both look at the same plan, and then the work happens. No more discovering halfway through that the AI built the wrong thing.
@@ -11,7 +14,7 @@ If you read nothing else, read these two pages:
 
 That second one matters more than it looks. OpenSpec has two halves: a command line tool you run in your terminal, and slash commands you give to your AI assistant. Knowing which is which saves you the most common moment of confusion.
 
-> **The best habit to build first: when you're not sure what to build, start with `/opsx:explore`.** It's a no-stakes thinking partner that reads your code, weighs options, and sharpens a fuzzy idea into a concrete plan before any artifact or code exists. The [Explore First](explore.md) guide makes the case.
+> **The best habit to build first: when you're not sure what to build, start with `/opsx:explore`.** It's a no-stakes thinking partner that reads your code, weighs options, and sharpens a fuzzy idea into a concrete plan before any code gets written. The [Explore First](explore.md) guide makes the case.
 
 ## Pick your path
 
@@ -76,6 +79,7 @@ That second one matters more than it looks. OpenSpec has two halves: a command l
 | [Customization](customization.md) | Project config, custom schemas, shared context |
 | [Multi-Language](multi-language.md) | Generate artifacts in languages other than English |
 | [Supported Tools](supported-tools.md) | The 30+ AI tools OpenSpec integrates with, and where files land |
+| [Community Showcase](community.md) | Projects and resources built with and for OpenSpec |
 
 ### When you need help
 
@@ -111,4 +115,4 @@ Steps 1 and 2 happen in your terminal. The rest happen in your AI assistant's ch
 - **GitHub Issues:** [github.com/Fission-AI/OpenSpec/issues](https://github.com/Fission-AI/OpenSpec/issues) for bugs and feature requests.
 - **`openspec feedback "your message"`** sends feedback straight from your terminal (it opens a GitHub issue).
 
-Found something in these docs that's wrong, stale, or confusing? That's a bug. Open an issue or a PR. Documentation improvements are some of the most valuable contributions you can make.
+Found something in these docs that's wrong, stale, or confusing? That's a bug — open a [docs issue](https://github.com/Fission-AI/OpenSpec/issues/new?template=docs.yml).

@@ -9,8 +9,13 @@ import { Change, Delta } from '../core/schemas/index.js';
 import type { RootOutput } from '../core/root-selection.js';
 import { isInteractive } from '../utils/interactive.js';
 import { getActiveChangeIds } from '../utils/item-discovery.js';
+import {
+  describeNestedChange,
+  findNestedChangesIn,
+} from '../utils/nested-change.js';
 import { getTaskProgressForChange } from '../utils/task-progress.js';
 import { FileSystemUtils } from '../utils/file-system.js';
+import { assertDiscoveredSpecFile } from '../utils/spec-path-containment.js';
 import { discoverSpecFiles } from '../utils/spec-discovery.js';
 import {
   foldRequirementName,
@@ -133,6 +138,13 @@ export class ChangeCommand {
         .then((stats) => stats.isDirectory())
         .catch(() => false);
       if (isChangeDirectory) {
+        // A folder holding nested change directories has no proposal of its
+        // own and never will; pointing at `status --change` would send the
+        // user down a second dead end (#1846).
+        const nested = await findNestedChangesIn(changesPath, changeName);
+        if (nested) {
+          throw new Error(describeNestedChange(nested));
+        }
         throw new Error(
           `Change "${changeName}" has no proposal.md yet. ` +
             `Run "openspec status --change ${changeName}" to see which artifact comes next.`
@@ -206,7 +218,7 @@ export class ChangeCommand {
       const mainSpecPath = path.join(mainSpecsDir, ...capability.split('/'), 'spec.md');
       let mainContent: string | null = null;
       try {
-        FileSystemUtils.assertPathWithin(mainSpecsDir, mainSpecPath);
+        assertDiscoveredSpecFile(mainSpecsDir, mainSpecPath);
         mainContent = await fs.readFile(mainSpecPath, 'utf-8');
       } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
@@ -545,11 +557,12 @@ export class ChangeCommand {
         console.log(`Change "${changeName}" is valid`);
       } else {
         console.error(`Change "${changeName}" has issues`);
-        report.issues.forEach(issue => {
-          const label = issue.level === 'ERROR' ? 'ERROR' : 'WARNING';
-          const prefix = issue.level === 'ERROR' ? '✗' : '⚠';
-          console.error(`${prefix} [${label}] ${issue.path}: ${issue.message}`);
-        });
+      }
+      report.issues.forEach(issue => {
+        const prefix = issue.level === 'ERROR' ? '✗' : issue.level === 'WARNING' ? '⚠' : 'ℹ';
+        console.error(`${prefix} [${issue.level}] ${issue.path}: ${issue.message}`);
+      });
+      if (!report.valid) {
         // Next steps footer to guide fixing issues
         this.printNextSteps(report.issues);
         if (!options?.json) {
@@ -561,7 +574,10 @@ export class ChangeCommand {
 
   private extractTitle(content: string, changeName: string): string {
     const match = content.match(/^#\s+(?:Change:\s+)?(.+)$/im);
-    return match ? match[1].trim() : changeName;
+    const title = match?.[1].trim();
+    // The packaged template opens every proposal with a bare `# Proposal`,
+    // which names the document rather than the change.
+    return title && title.toLowerCase() !== 'proposal' ? title : changeName;
   }
 
   private printNextSteps(issues: Array<{ message: string }> = []): void {

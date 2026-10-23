@@ -7,7 +7,8 @@
  * this command.
  */
 
-import ora from 'ora';
+import chalk from 'chalk';
+import type { Ora } from 'ora';
 import path from 'path';
 import { createChange, validateChangeName } from '../../utils/change-utils.js';
 import { formatChangeLocation } from '../../core/planning-home.js';
@@ -21,6 +22,7 @@ import {
   type RootOutput,
   isStoreSelectedRoot,
 } from '../../core/root-selection.js';
+import { readProjectConfig } from '../../core/project-config.js';
 import { printJson, statusFromError, validateSchemaExists } from './shared.js';
 
 // -----------------------------------------------------------------------------
@@ -85,8 +87,39 @@ function printCreatedChangeHuman(
   console.log(`Next: ${withStoreFlag(root, `openspec status --change ${payload.change.id}`)}`);
 }
 
+/**
+ * An implicit root is the fallback taken when no `openspec/` directory was
+ * found: creating a change there materializes OpenSpec in whatever directory
+ * the caller happened to be in, which is how an agent ends up adopting a
+ * project that never ran `openspec init` (#1645). The creation itself stays
+ * zero-config; this only makes it visible.
+ */
+function printImplicitRootNotice(root: ResolvedOpenSpecRoot): void {
+  if (root.source !== 'implicit') {
+    return;
+  }
+
+  const openspecDir = path.dirname(root.changesDir);
+  const relative = path.relative(process.cwd(), openspecDir);
+  const location = relative && !relative.startsWith('..') ? relative : openspecDir;
+
+  console.log();
+  console.log(
+    chalk.dim(`Note: no OpenSpec root was found here, so one was created at ${location}/.`)
+  );
+  console.log(
+    chalk.dim(
+      'Run `openspec init` to finish setting this project up, or delete that directory if you meant a different project.'
+    )
+  );
+}
+
 export async function newChangeCommand(name: string | undefined, options: NewChangeOptions): Promise<void> {
-  const spinner = options.json ? undefined : ora();
+  let spinner: Ora | undefined;
+  if (!options.json) {
+    const { default: ora } = await import('ora');
+    spinner = ora();
+  }
 
   try {
     if (!name) {
@@ -115,13 +148,18 @@ export async function newChangeCommand(name: string | undefined, options: NewCha
       validateSchemaExists(options.schema, projectRoot);
     }
 
-    const resolvedSchema = options.schema ?? root.defaultSchema;
+    // Resolve the schema once (--schema, then config, then the root default)
+    // and hand it to createChange, so the progress line names the schema the
+    // change gets and config warnings print only once. An empty --schema is
+    // absent, matching createChange's `if (options.schema)`.
+    const resolvedSchema =
+      options.schema || (readProjectConfig(projectRoot)?.schema ?? root.defaultSchema);
     if (spinner) {
       spinner.start(`Creating change '${name}' with schema '${resolvedSchema}'...`);
     }
 
     const result = await createChange(projectRoot, name, {
-      schema: options.schema,
+      schema: resolvedSchema,
       defaultSchema: root.defaultSchema,
       changesDir: root.changesDir,
       metadata: {
@@ -153,6 +191,7 @@ export async function newChangeCommand(name: string | undefined, options: NewCha
 
     spinner?.stop();
     printCreatedChangeHuman(payload, root);
+    printImplicitRootNotice(root);
   } catch (error) {
     spinner?.stop();
     if (options.json) {

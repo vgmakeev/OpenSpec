@@ -7,6 +7,10 @@
 
 import chalk from 'chalk';
 import path from 'path';
+import {
+  describeNestedChange,
+  findNestedChangesIn,
+} from '../../utils/nested-change.js';
 import * as fs from 'fs';
 import { getSchemaDir, listSchemas } from '../../core/artifact-graph/index.js';
 import type { ReferenceIndexEntry } from '../../core/references.js';
@@ -28,6 +32,8 @@ export interface TaskItem {
   id: string;
   description: string;
   done: boolean;
+  sourcePath: string;
+  line: number;
 }
 
 export interface ApplyInstructions {
@@ -41,8 +47,21 @@ export interface ApplyInstructions {
     remaining: number;
   };
   tasks: TaskItem[];
+  taskTrackingConfigured: boolean;
+  unavailableTrackingFiles?: Array<{
+    path: string;
+    reason: string;
+  }>;
   state: 'blocked' | 'all_done' | 'ready';
   missingArtifacts?: string[];
+  /**
+   * Everything still to build before apply can run, in build order - the
+   * transitive closure of the schema's `apply.requires`, so it can be longer
+   * than `missingArtifacts`, which stops at the first hop apply blocks on.
+   */
+  missingPrerequisites?: string[];
+  /** Non-blocking problems with the change, reported alongside the instruction. */
+  warnings?: string[];
   instruction: string;
   /** Referenced-store index (read-only upstream context; omitted when none declared) */
   references?: ReferenceIndexEntry[];
@@ -64,7 +83,7 @@ export interface ArchiveInstructions {
 // Constants
 // -----------------------------------------------------------------------------
 
-export const DEFAULT_SCHEMA = 'spec-driven';
+export { DEFAULT_SCHEMA } from './default-schema.js';
 
 // -----------------------------------------------------------------------------
 // Utility Functions
@@ -221,6 +240,14 @@ export async function validateChangeExists(
     throw new Error(
       `Change '${changeName}' not found. Available changes:\n  ${available.join('\n  ')}`
     );
+  }
+
+  // The directory exists but is a namespace folder wrapping nested change
+  // directories. Every artifact lookup below it would report "not started" for
+  // work that is in fact there, so say what is actually wrong instead (#1846).
+  const nested = await findNestedChangesIn(changesDir, changeName);
+  if (nested) {
+    throw new Error(describeNestedChange(nested));
   }
 
   return changeName;

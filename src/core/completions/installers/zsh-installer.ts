@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { FileSystemUtils } from '../../../utils/file-system.js';
 import { InstallationResult } from '../factory.js';
+import { shellSingleQuote } from './shell-quote.js';
 
 /**
  * Installer for Zsh completion scripts.
@@ -119,7 +120,7 @@ export class ZshInstaller {
   private generateZshrcConfig(completionsDir: string): string {
     return [
       '# OpenSpec shell completions configuration',
-      `fpath=("${completionsDir}" $fpath)`,
+      `fpath=(${shellSingleQuote(completionsDir)} $fpath)`,
       'autoload -Uz compinit',
       'compinit',
     ].join('\n');
@@ -219,8 +220,10 @@ export class ZshInstaller {
       // Remove lines between markers (inclusive)
       lines.splice(startIndex, endIndex - startIndex + 1);
 
-      // Remove trailing empty lines at the start if the markers were at the top
-      while (lines.length > 0 && lines[0].trim() === '') {
+      // Install puts the block at the top of the file followed by one blank
+      // separator line; drop that line too so the file reads as it did before.
+      // Everything else, including blank lines the user had at the top, is left as is.
+      if (startIndex === 0 && lines.length > 0 && lines[0].trim() === '') {
         lines.shift();
       }
 
@@ -377,7 +380,7 @@ export class ZshInstaller {
         'To enable completions, add the following to your ~/.zshrc file:',
         '',
         `  # Add completions directory to fpath`,
-        `  fpath=(${completionsDir} $fpath)`,
+        `  fpath=(${shellSingleQuote(completionsDir)} $fpath)`,
         '',
         '  # Initialize completion system',
         '  autoload -Uz compinit',

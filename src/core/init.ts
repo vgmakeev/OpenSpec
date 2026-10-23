@@ -18,9 +18,13 @@ import {
   storePointerProblem,
 } from './project-config.js';
 import { findRepoPlanningRootSync } from './planning-home.js';
+import { resolveOpenSpecRoot } from './root-selection.js';
+import { ANCHORED_OPENSPEC_DIRS, ensureDirectoryAnchor } from './openspec-root.js';
 import { getSkillReferenceTransformer, getTransformerForTool, usesNaturalLanguageSkillReferences } from '../utils/command-references.js';
 import {
   AI_TOOLS,
+  getUniversalTool,
+  universalToolFallbackHint,
   OPENSPEC_DIR_NAME,
   AIToolOption,
   resolveToolIdAlias,
@@ -55,10 +59,12 @@ import {
   resolveToolSkillsDir,
   toolSupportsSkills,
   type ToolSkillStatus,
+  formatIdeRestart,
 } from './shared/index.js';
 import { getGlobalConfig, type Delivery, type Profile } from './global-config.js';
 import { getProfileWorkflows, CORE_WORKFLOWS, ALL_WORKFLOWS } from './profiles.js';
 import { getAvailableTools } from './available-tools.js';
+import { formatOptionalWorkflowsNote } from './onboarding-commands.js';
 import {
   resolveSharedSkillWriters,
   sharedSkillRootOwner,
@@ -148,7 +154,6 @@ type ValidatedInitTool = {
   skillsRoot: string;
   isGlobalSkillTarget: boolean;
   wasConfigured: boolean;
-  requiresIdeRestart?: boolean;
   writesSkills: boolean;
 };
 
@@ -184,7 +189,7 @@ export class InitCommand {
   }
 
   async execute(targetPath: string): Promise<void> {
-    const projectPath = path.resolve(targetPath);
+    const projectPath = FileSystemUtils.canonicalizeExistingPath(targetPath);
     const openspecDir = OPENSPEC_DIR_NAME;
     const openspecPath = path.join(projectPath, openspecDir);
 
@@ -199,6 +204,7 @@ export class InitCommand {
     // finds the nearest ancestor root (so pointer-repo subdirectories
     // refuse exactly where a normal command would resolve the pointer).
     const guardRoot = findRepoPlanningRootSync(projectPath);
+    let integrationsOnly = false;
     if (guardRoot) {
       const { hasPlanningShape, pointer } = classifyOpenSpecDir(guardRoot);
       if (!hasPlanningShape) {
@@ -210,18 +216,36 @@ export class InitCommand {
           );
         }
         if (pointer.value !== undefined) {
-          throw new Error(
-            `This repo's planning is externalized to store '${pointer.value}' (${pointer.filePath}). ` +
-              `Remove the store: line first to convert this repo to a local OpenSpec root.`
-          );
+          if (path.resolve(guardRoot) !== projectPath) {
+            throw new Error(
+              `This repo's planning is externalized to store '${pointer.value}' (${pointer.filePath}). ` +
+                'Run openspec init from the pointer repo root to install integrations.'
+            );
+          }
+
+          // A valid pointer repo already has its planning root in the declared
+          // store. Init should still be able to install agent integrations in
+          // the code repo, without creating a second local planning root.
+          await resolveOpenSpecRoot({ startPath: projectPath });
+          integrationsOnly = true;
         }
       }
     }
 
-    await this.assertLanguageCanBeApplied(projectPath, openspecPath);
+    if (!integrationsOnly) {
+      await this.assertLanguageCanBeApplied(projectPath, openspecPath);
+    } else if (this.language) {
+      throw new Error(
+        '--language cannot update an external store through a pointer repo. ' +
+        'Run init in the store root, or edit the store config directly.'
+      );
+    }
 
-    // Check for legacy artifacts and handle cleanup
-    const deferredLegacyCleanup = await this.handleLegacyCleanup(projectPath, extendMode);
+    // Pointer repos keep their local planning files untouched. Normal init may
+    // still remove OpenSpec-managed artifacts from older layouts.
+    const deferredLegacyCleanup = integrationsOnly
+      ? null
+      : await this.handleLegacyCleanup(projectPath, extendMode);
 
     // Migrate OpenSpec-managed skills left in renamed tool directories
     // (e.g. .kimi -> .kimi-code) before detection so they stay recognized.
@@ -278,8 +302,11 @@ export class InitCommand {
     // config.yaml exists so future non-interactive updates honor it.
     const copilotDecision = await this.resolveCopilotCloudDecision(projectPath, validatedTools);
 
-    // Create directory structure and config
-    await this.createDirectoryStructure(openspecPath, extendMode);
+    // Pointer repos only receive integrations. Their planning structure and
+    // config stay in the declared store.
+    if (!integrationsOnly) {
+      await this.createDirectoryStructure(openspecPath, extendMode);
+    }
 
     // Generate skills and commands for each tool
     const results = await this.generateSkillsAndCommands(
@@ -294,13 +321,16 @@ export class InitCommand {
       await this.finalizeDeferredLegacyCleanup(projectPath, deferredLegacyCleanup);
     }
 
-    // Create config.yaml if needed
-    const configStatus = await this.createConfig(openspecPath, extendMode);
+    // Create config.yaml if needed. A pointer repo already has the config that
+    // declares its store, so preserve it byte-for-byte.
+    const configStatus = integrationsOnly
+      ? 'exists' as const
+      : await this.createConfig(openspecPath, extendMode);
 
     // Persist an explicit Copilot cloud decision so `openspec update` (which
     // never prompts) honors it. Best-effort: a config-write failure must not
     // fail an otherwise-successful init.
-    if (copilotDecision.persist !== undefined) {
+    if (!integrationsOnly && copilotDecision.persist !== undefined) {
       try {
         await persistCopilotCloudOptIn(projectPath, copilotDecision.persist);
       } catch {
@@ -630,8 +660,9 @@ export class InitCommand {
       if (detectedToolIds.size > 0) {
         return [...detectedToolIds];
       }
+      const fallbackHint = universalToolFallbackHint(validTools);
       throw new Error(
-        `No tools detected and no --tools flag provided. Valid tools:\n  ${validTools.join('\n  ')}\n\nUse --tools all, --tools none, or --tools claude,cursor,...`
+        `No tools detected and no --tools flag provided. Valid tools:\n  ${validTools.join('\n  ')}\n\nUse --tools all, --tools none, or --tools claude,cursor,...${fallbackHint ? `\n${fallbackHint}` : ''}`
       );
     }
 
@@ -655,6 +686,7 @@ export class InitCommand {
         return {
           name: tool?.name || toolId,
           value: toolId,
+          searchAliases: tool?.searchAliases,
           configured,
           detected: detected && !configured,
           preSelected: configured || (shouldPreselectDetected && detected && !configured),
@@ -688,10 +720,19 @@ export class InitCommand {
       console.log(`Detected tool directories: ${detectedOnlyNames.join(', ')} (${detectionLabel})`);
     }
 
+    // A search that matches nothing is where someone whose assistant is not on
+    // the list gives up (#653), so name the vendor-neutral entry right there.
+    const universalTool = getUniversalTool();
+    const universalHint =
+      universalTool && validTools.includes(universalTool.value)
+        ? `Tool not listed? Clear the search and pick "${universalTool.name}".`
+        : undefined;
+
     const selectedTools = await searchableMultiSelect({
       message: `Select tools to set up (${validTools.length} available)`,
       pageSize: 15,
       choices: sortedChoices,
+      emptyHint: universalHint,
       validate: (selected: string[]) => selected.length > 0 || 'Select at least one tool',
     });
 
@@ -751,8 +792,9 @@ export class InitCommand {
     );
 
     if (invalidTokens.length > 0) {
+      const fallbackHint = universalToolFallbackHint([...availableSet]);
       throw new Error(
-        `Invalid tool(s): ${invalidTokens.join(', ')}. Available values: ${availableList}`
+        `Invalid tool(s): ${invalidTokens.join(', ')}. Available values: ${availableList}${fallbackHint ? `\n${fallbackHint}` : ''}`
       );
     }
 
@@ -843,7 +885,6 @@ export class InitCommand {
         skillsRoot: isGlobalSkillTarget ? skillsPath : projectPath,
         isGlobalSkillTarget,
         wasConfigured: preState?.configured ?? false,
-        requiresIdeRestart: tool.requiresIdeRestart,
         writesSkills: !tool.skillsDir || skillWriters.has(tool.value),
       });
     }
@@ -856,24 +897,6 @@ export class InitCommand {
   // ═══════════════════════════════════════════════════════════
 
   private async createDirectoryStructure(openspecPath: string, extendMode: boolean): Promise<void> {
-    if (extendMode) {
-      // In extend mode, just ensure directories exist without spinner
-      const directories = [
-        openspecPath,
-        path.join(openspecPath, 'specs'),
-        path.join(openspecPath, 'changes'),
-        path.join(openspecPath, 'changes', 'archive'),
-      ];
-
-      for (const dir of directories) {
-        FileSystemUtils.assertProjectArtifactPath(path.dirname(openspecPath), dir);
-        await FileSystemUtils.createDirectory(dir);
-      }
-      return;
-    }
-
-    const spinner = this.startSpinner('Creating OpenSpec structure...');
-
     const directories = [
       openspecPath,
       path.join(openspecPath, 'specs'),
@@ -881,15 +904,35 @@ export class InitCommand {
       path.join(openspecPath, 'changes', 'archive'),
     ];
 
+    if (extendMode) {
+      // In extend mode, just ensure directories exist without spinner
+      for (const dir of directories) {
+        FileSystemUtils.assertProjectArtifactPath(path.dirname(openspecPath), dir);
+        await FileSystemUtils.createDirectory(dir);
+      }
+      await this.writeGitkeepFiles(openspecPath);
+      return;
+    }
+
+    const spinner = this.startSpinner('Creating OpenSpec structure...');
+
     for (const dir of directories) {
       FileSystemUtils.assertProjectArtifactPath(path.dirname(openspecPath), dir);
       await FileSystemUtils.createDirectory(dir);
     }
 
+    await this.writeGitkeepFiles(openspecPath);
+
     spinner.stopAndPersist({
       symbol: PALETTE.white('▌'),
       text: PALETTE.white('OpenSpec structure created'),
     });
+  }
+
+  private async writeGitkeepFiles(openspecPath: string): Promise<void> {
+    for (const relativeDir of ANCHORED_OPENSPEC_DIRS) {
+      await ensureDirectoryAnchor(path.dirname(openspecPath), relativeDir);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -1343,9 +1386,13 @@ export class InitCommand {
           // Tools with no slash surface (e.g. Rovo Dev) reference skills as
           // prose ("the openspec-propose skill"); phrase the hint so it reads
           // as an instruction rather than a dead command with an argument.
-          hint = usesNaturalLanguageSkillReferences(tool.value)
-            ? `Start your first change: ask ${tool.name} to use ${skillReference} with "your idea"`
-            : `Start your first change: ${skillReference} "your idea"`;
+          if (usesNaturalLanguageSkillReferences(tool.value)) {
+            hint = `Start your first change: ask ${tool.name} to use ${skillReference} with "your idea"`;
+          } else if (tool.value === 'codex') {
+            hint = `Start your first change: ${skillReference} "your idea" (Codex CLI or IDE); in the Codex desktop app, select ${skillReference.slice(1)} from Skills in the sidebar`;
+          } else {
+            hint = `Start your first change: ${skillReference} "your idea"`;
+          }
         } else {
           continue;
         }
@@ -1386,15 +1433,35 @@ export class InitCommand {
         )
       );
     }
+    let advertisedAnInvocation = true;
     if (successfulTools.length > 0 && !commandsGenerated && !skillsGenerated) {
       // Nothing was generated for any tool: the correction above is the
       // whole story, so don't advertise an invocation that doesn't exist.
+      advertisedAnInvocation = false;
     } else if (activeWorkflows.includes('propose')) {
       printStartHints('/opsx:propose');
     } else if (activeWorkflows.includes('new')) {
       printStartHints('/opsx:new');
     } else {
       console.log("Done. Run 'openspec config profile' to configure your workflows.");
+      advertisedAnInvocation = false;
+    }
+
+    // Workflows the active profile left out. Setup is the only moment a user
+    // is told what exists, so name them here rather than let a missing
+    // command read as a broken install (#1076). Skipped when the branch above
+    // already pointed at `openspec config profile`, and when no tool received
+    // a workflow surface at all (no tools selected, or none that could take
+    // one) — there, adding workflows writes nothing, so naming them would
+    // point at the wrong problem.
+    if (advertisedAnInvocation && (commandsGenerated || skillsGenerated)) {
+      const optionalWorkflowsNote = formatOptionalWorkflowsNote(activeWorkflows);
+      if (optionalWorkflowsNote) {
+        console.log();
+        for (const line of optionalWorkflowsNote) {
+          console.log(chalk.dim(line));
+        }
+      }
     }
 
     // Links
@@ -1402,37 +1469,16 @@ export class InitCommand {
     console.log(`Learn more: ${chalk.cyan('https://github.com/Fission-AI/OpenSpec')}`);
     console.log(`Feedback:   ${chalk.cyan('https://github.com/Fission-AI/OpenSpec/issues')}`);
 
-    // Restart instruction only when at least one IDE/editor-resident tool
-    // actually received a generated surface. Two conditions, coupled to the SAME
-    // tool: (1) its commands/skills are loaded by a long-running editor process
-    // (CLI tools pick the files up immediately, so a restart line would be wrong
-    // for them — see #1067), and (2) a surface was actually generated for it
-    // under the active delivery (an IDE tool that generated nothing has nothing a
-    // restart would pick up, even if a co-configured CLI tool did generate).
-    // Wording follows what the IDE tool itself generated, not the global
-    // aggregate: it must not say "commands" when the IDE tool only got skills
-    // while a co-configured CLI tool got commands. Not "slash commands" either:
-    // Amazon Q's generated files are prompt-library entries invoked with @, so a
-    // restart line promising slash commands would be wrong for it.
-    const restartCommandsGenerated = successfulTools.some(
-      (tool) =>
-        tool.requiresIdeRestart &&
-        shouldGenerateCommandsForTool(tool.value, activeDelivery)
+    // Restart instruction for successfully configured IDE/editor-resident tools
+    // with a supported surface under the active delivery. The rule and wording live in
+    // formatIdeRestart so `update` says the same thing for the same event.
+    const restartHint = formatIdeRestart(
+      successfulTools.map((tool) => tool.value),
+      activeDelivery
     );
-    const restartSkillsGenerated = successfulTools.some(
-      (tool) =>
-        tool.requiresIdeRestart &&
-        shouldGenerateSkillsForTool(tool.value, activeDelivery)
-    );
-    if (restartCommandsGenerated || restartSkillsGenerated) {
+    if (restartHint) {
       console.log();
-      console.log(
-        chalk.white(
-          restartCommandsGenerated
-            ? 'Restart your IDE for the new commands to take effect.'
-            : 'Restart your IDE for the new skills to take effect.'
-        )
-      );
+      console.log(chalk.white(restartHint));
     }
 
     console.log();

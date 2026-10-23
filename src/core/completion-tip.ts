@@ -18,11 +18,10 @@
  *   non-TTY runs, which are deferred rather than consumed (see `silent`)
  */
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { getGlobalConfigPath } from './global-config.js';
+import { writeFileAtomically } from './file-state.js';
 import { isCiEnvironment } from '../utils/ci.js';
 import { detectShell } from '../utils/shell-detection.js';
-import { CompletionFactory } from './completions/factory.js';
 
 export const COMPLETION_TIP_MESSAGE =
   "Tip: Run 'openspec completion install' for shell completions";
@@ -67,6 +66,9 @@ async function decideTip(): Promise<'show' | 'retire'> {
     if (!shell) {
       return 'retire';
     }
+    // Loaded only here: every shell's generator and installer, needed only on
+    // the rare run that still owes the tip.
+    const { CompletionFactory } = await import('./completions/factory.js');
     return (await CompletionFactory.createInstaller(shell).isInstalled())
       ? 'retire'
       : 'show';
@@ -109,18 +111,17 @@ function readRawConfig(): Record<string, unknown> | null {
  * write down to this one key, and the rename keeps a reader from ever seeing a
  * half-written config.
  */
-function markTipSeen(): void {
+async function markTipSeen(): Promise<void> {
   const configPath = getGlobalConfigPath();
   const current = readRawConfig() ?? {};
-  const tempPath = `${configPath}.${process.pid}.tmp`;
 
-  fs.mkdirSync(path.dirname(configPath), { recursive: true });
-  fs.writeFileSync(
-    tempPath,
-    JSON.stringify({ ...current, completionTipSeen: true }, null, 2) + '\n',
-    'utf-8'
+  // The shared atomic writer: randomized temp name, owner-only mode, temp file
+  // removed on failure. A predictable `<config>.<pid>.tmp` at the default mode
+  // is both guessable and world-readable once renamed over the config.
+  await writeFileAtomically(
+    configPath,
+    JSON.stringify({ ...current, completionTipSeen: true }, null, 2) + '\n'
   );
-  fs.renameSync(tempPath, configPath);
 }
 
 /**
@@ -148,7 +149,7 @@ export async function maybeShowCompletionTip(
 
     // Record before printing: if the flag cannot be persisted, staying quiet
     // beats reprinting the tip on every future run.
-    markTipSeen();
+    await markTipSeen();
     if (decision === 'show') {
       console.error(`\n${COMPLETION_TIP_MESSAGE}`);
     }

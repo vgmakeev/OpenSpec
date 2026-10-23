@@ -5,17 +5,18 @@
  * Includes both artifact instructions and apply instructions.
  */
 
-import ora from 'ora';
+import type { Ora } from 'ora';
 import path from 'path';
 import * as fs from 'fs';
 import {
   loadChangeContext,
   generateInstructions,
   resolveSchema,
-  resolveArtifactOutputPath,
   resolveArtifactOutputs,
   type ArtifactInstructions,
 } from '../../core/artifact-graph/index.js';
+import { isSpecsArtifactPath } from '../../core/artifact-graph/outputs.js';
+import { findUnreadDeltaFiles } from '../../utils/spec-discovery.js';
 import {
   getChangeDir,
   resolveCurrentPlanningHomeSync,
@@ -30,8 +31,11 @@ import {
 } from '../../core/root-selection.js';
 import {
   assembleReferenceIndex,
+  escapeEnvelopeAttribute,
+  escapeEnvelopeTags,
   renderReferencedStoresBlock,
   renderReferencedStoresSection,
+  sanitizeInline,
   type ReferenceIndexEntry,
 } from '../../core/references.js';
 import { readRegistrySnapshot } from '../../core/store/registry.js';
@@ -48,6 +52,7 @@ import {
   type ArchiveInstructions,
 } from './shared.js';
 import { parseTaskLines, type ParsedTask } from '../../utils/task-progress.js';
+import { METADATA_FILENAME } from '../../utils/change-metadata.js';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -116,7 +121,11 @@ export async function instructionsCommand(
     return;
   }
 
-  const spinner = options.json ? undefined : ora('Generating instructions...').start();
+  let spinner: Ora | undefined;
+  if (!options.json) {
+    const { default: ora } = await import('ora');
+    spinner = ora('Generating instructions...').start();
+  }
 
   try {
     const planningHome = toPlanningHome(root);
@@ -196,9 +205,24 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
     unlocks,
   } = instructions;
 
-  // Opening tag
-  console.log(`<artifact id="${artifactId}" change="${changeName}" schema="${schemaName}">`);
+  // Opening tag. The change name is a directory name read from disk, and the
+  // read path rejects only separators and NUL - a quote in it would otherwise
+  // close the attribute and forge siblings on this tag.
+  console.log(
+    `<artifact id="${escapeEnvelopeAttribute(artifactId)}"` +
+      ` change="${escapeEnvelopeAttribute(changeName)}"` +
+      ` schema="${escapeEnvelopeAttribute(schemaName)}">`
+  );
   console.log();
+
+  if (instructions.warnings) {
+    for (const warning of instructions.warnings) {
+      console.log('<warning>');
+      console.log(escapeEnvelopeTags(warning));
+      console.log('</warning>');
+      console.log();
+    }
+  }
 
   // Artifacts skipped via skip_specs get no creation directive: emitting the
   // task/template anyway would prompt an agent to write spec files that
@@ -224,8 +248,10 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
 
   // Task directive
   console.log('<task>');
-  console.log(`Create the ${artifactId} artifact for change "${changeName}".`);
-  console.log(description);
+  console.log(
+    `Create the ${escapeEnvelopeTags(artifactId)} artifact for change "${escapeEnvelopeTags(changeName)}".`
+  );
+  console.log(escapeEnvelopeTags(description));
   console.log('</task>');
   console.log();
 
@@ -233,7 +259,7 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
   if (context) {
     console.log('<project_context>');
     console.log('<!-- This is background information for you. Do NOT include this in your output. -->');
-    console.log(context);
+    console.log(escapeEnvelopeTags(context));
     console.log('</project_context>');
     console.log();
   }
@@ -249,7 +275,9 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
     console.log('<rules>');
     console.log('<!-- These are constraints for you to follow. Do NOT include this in your output. -->');
     for (const rule of rules) {
-      console.log(`- ${rule}`);
+      // Flattened so a newline cannot forge a sibling bullet, but never
+      // truncated: these are instructions an agent has to follow in full.
+      console.log(`- ${escapeEnvelopeTags(sanitizeInline(rule, Infinity))}`);
     }
     console.log('</rules>');
     console.log();
@@ -274,7 +302,7 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
       const fullPath = path.join(changeDir, dep.path);
       console.log(`<dependency id="${dep.id}" status="${status}">`);
       console.log(`  <path>${fullPath}</path>`);
-      console.log(`  <description>${dep.description}</description>`);
+      console.log(`  <description>${escapeEnvelopeTags(dep.description)}</description>`);
       console.log('</dependency>');
     }
     console.log('</dependencies>');
@@ -290,7 +318,7 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
   // Instruction (guidance)
   if (instruction) {
     console.log('<instruction>');
-    console.log(instruction.trim());
+    console.log(escapeEnvelopeTags(instruction.trim()));
     console.log('</instruction>');
     console.log();
   }
@@ -298,7 +326,10 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
   // Template
   console.log('<template>');
   console.log('<!-- Use this as the structure for your output file. Fill in the sections. -->');
-  console.log(template.trim());
+  // Copied verbatim into the artifact file, so its `<!-- ... -->` comments and
+  // `<placeholder>` markers must survive - only the envelope's own closing
+  // tags are neutralized.
+  console.log(escapeEnvelopeTags(template.trim()));
   console.log('</template>');
   console.log();
 
@@ -324,6 +355,23 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
 // Apply Instructions Command
 // -----------------------------------------------------------------------------
 
+interface LocatedTask extends ParsedTask {
+  sourcePath: string;
+  line: number;
+}
+
+/** Adds one-based source locations to parsed tasks without changing task parsing. */
+function parseLocatedTasks(content: string, sourcePath: string): LocatedTask[] {
+  const tasks: LocatedTask[] = [];
+
+  for (const [index, line] of content.split('\n').entries()) {
+    const [task] = parseTaskLines(line);
+    if (task) tasks.push({ ...task, sourcePath, line: index + 1 });
+  }
+
+  return tasks;
+}
+
 /**
  * Turns parsed task lines into the listed task items.
  *
@@ -335,7 +383,7 @@ export function printInstructionsText(instructions: ArtifactInstructions, isBloc
  * what puts apply in its "nothing to work on" state, so a file of nothing but
  * text-less checkboxes asks to be rewritten instead of being called done.
  */
-function toTaskItems(parsed: ParsedTask[]): TaskItem[] {
+function toTaskItems(parsed: LocatedTask[]): TaskItem[] {
   const tasks: TaskItem[] = [];
 
   for (const task of parsed) {
@@ -344,10 +392,142 @@ function toTaskItems(parsed: ParsedTask[]): TaskItem[] {
       id: `${tasks.length + 1}`,
       description: task.description,
       done: task.done,
+      sourcePath: task.sourcePath,
+      line: task.line,
     });
   }
 
   return tasks;
+}
+
+/**
+ * The command that builds one artifact.
+ *
+ * Every earlier remedy here named the `openspec-continue-change` skill, which
+ * the `core` profile never installs - the advice was a dead end for the default
+ * install. The CLI verb exists on every profile and is what the skill runs.
+ */
+function describeArtifactRemedy(
+  changeName: string,
+  artifactId?: string,
+  options: { many?: boolean } = {}
+): string {
+  const target = artifactId ?? '<artifact>';
+  const verb = options.many ? 'Create each with' : 'Create it with';
+  return (
+    `${verb} \`openspec instructions ${target} --change ${changeName}\`` +
+    ` (\`openspec status --change ${changeName}\` shows what is left).`
+  );
+}
+
+/**
+ * Finds the artifact a schema path is generated by, so a remedy can name it.
+ */
+function findArtifactIdFor(
+  schema: { artifacts: { id: string; generates: string }[] },
+  generates: string
+): string | undefined {
+  return schema.artifacts.find((artifact) => artifact.generates === generates)?.id;
+}
+
+/**
+ * Everything still to build before apply can run, in build order.
+ *
+ * Apply blocks on the schema's `apply.requires` alone, so its own list stops at
+ * the first hop: a change with only a proposal is told "Missing artifacts:
+ * tasks" while the specs `tasks` depends on are missing too. An agent that
+ * takes that literally writes the tracking file straight from the proposal and
+ * skips the artifacts in between - the failure reported in #834 and #869.
+ * Walking `requires` names the whole chain, the same set and order
+ * `openspec status` already prints, without changing what apply blocks on.
+ */
+function collectMissingPrerequisites(input: {
+  requiredArtifactIds: string[];
+  schema: { artifacts: { id: string; requires: string[] }[] };
+  buildOrder: string[];
+  completed: Set<string>;
+}): string[] {
+  const { requiredArtifactIds, schema, buildOrder, completed } = input;
+  const byId = new Map(schema.artifacts.map((artifact) => [artifact.id, artifact]));
+  const missing = new Set<string>();
+  const queue = [...requiredArtifactIds];
+  const seen = new Set<string>(queue);
+
+  while (queue.length > 0) {
+    const id = queue.shift() as string;
+    const artifact = byId.get(id);
+    if (!artifact) continue;
+    if (!completed.has(id)) missing.add(id);
+    for (const dependency of artifact.requires) {
+      if (seen.has(dependency)) continue;
+      seen.add(dependency);
+      queue.push(dependency);
+    }
+  }
+
+  const order = new Map(buildOrder.map((id, index) => [id, index]));
+  return [...missing].sort(
+    (a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0)
+  );
+}
+
+/**
+ * Warnings apply reports alongside its instruction.
+ *
+ * Apply gates on the schema's `apply.requires` only, so a change whose tasks
+ * file was written ahead of its specs reads as ready even though no delta spec
+ * exists - the state `openspec validate` rejects. Blocking here would be a
+ * policy change; naming the gap is not, and it is what keeps apply from being
+ * the one surface that green-lights a change every other surface flags.
+ *
+ * Only reported once apply is past its own gate: for a change that has not
+ * reached tasks yet, the missing specs are the next step rather than a warning.
+ * Schemas that declare no spec-producing artifact carry `skip_specs` from
+ * creation, so this never fires on them.
+ *
+ * A delta file the merge path never reads (specs/<capability>.md, a note
+ * beside spec.md) still satisfies the specs glob, so it reads as written here
+ * while validate rejects it and archive would drop it. Each one is named.
+ */
+async function collectApplyWarnings(input: {
+  state: ApplyInstructions['state'];
+  schema: { artifacts: { id: string; generates: string }[] };
+  changeDir: string;
+  changeName: string;
+  skippedArtifacts?: Set<string>;
+}): Promise<string[]> {
+  const { state, schema, changeDir, changeName, skippedArtifacts } = input;
+  if (state === 'blocked') return [];
+
+  const specArtifacts = schema.artifacts.filter((artifact) =>
+    isSpecsArtifactPath(artifact.generates)
+  );
+  if (specArtifacts.length === 0) return [];
+  if (specArtifacts.some((artifact) => skippedArtifacts?.has(artifact.id))) return [];
+  const warnings = (await findUnreadDeltaFiles(path.join(changeDir, 'specs'))).map(
+    (file) =>
+      `specs/${file.path} is not a capability's spec.md, so \`openspec validate ${changeName}\` rejects it and archive never merges it. ` +
+      `Move its requirements into specs/${file.expected}.`
+  );
+  const hasDeltas = specArtifacts.some(
+    (artifact) => resolveArtifactOutputs(changeDir, artifact.generates).length > 0
+  );
+  if (hasDeltas) return warnings;
+
+  const metadataPath = path.join(changeDir, METADATA_FILENAME);
+  // The command names the artifact this schema actually declares, never the
+  // literal `specs`. A schema whose spec-producing artifact is `contracts` was
+  // told to run `openspec instructions specs`, an artifact it does not have,
+  // so the warning dead-ended at the exact step meant to resolve it. With more
+  // than one such artifact there is no single right answer, so the id becomes
+  // a placeholder rather than a guess.
+  const specTarget = specArtifacts.length === 1 ? specArtifacts[0].id : '<artifact-id>';
+  return [
+    ...warnings,
+    `This change has no delta specs and does not declare \`skip_specs: true\`, so \`openspec validate ${changeName}\` fails on it. ` +
+      `Write the delta specs before implementing (\`openspec instructions ${specTarget} --change ${changeName}\`), ` +
+      `or add \`skip_specs: true\` to ${metadataPath} if this change really changes no specified behavior.`,
+  ];
 }
 
 export interface GenerateApplyInstructionsOptions {
@@ -403,6 +583,14 @@ export async function generateApplyInstructions(
     }
   }
 
+  // Everything still to build, not just the first hop apply blocks on.
+  const missingPrerequisites = collectMissingPrerequisites({
+    requiredArtifactIds: [...requiredArtifactIds],
+    schema,
+    buildOrder: context.graph.getBuildOrder(),
+    completed: context.completed,
+  });
+
   // Build context files from all existing artifacts in schema
   const contextFiles: Record<string, string[]> = {};
   for (const artifact of schema.artifacts) {
@@ -412,15 +600,27 @@ export async function generateApplyInstructions(
     }
   }
 
-  // Parse tasks if tracking file exists
-  let parsedTasks: ParsedTask[] = [];
+  // Parse every concrete file matched by apply.tracks. A tracking path may be
+  // a glob owned by an artifact with any ID, so treating it as one literal
+  // path loses task evidence for valid custom schemas.
+  let parsedTasks: LocatedTask[] = [];
+  const unavailableTrackingFiles: Array<{ path: string; reason: string }> = [];
   let tracksFileExists = false;
   if (tracksFile) {
-    const tracksPath = resolveArtifactOutputPath(changeDir, tracksFile);
-    tracksFileExists = fs.existsSync(tracksPath);
-    if (tracksFileExists) {
-      const tasksContent = await fs.promises.readFile(tracksPath, 'utf-8');
-      parsedTasks = parseTaskLines(tasksContent);
+    const tracksPaths = resolveArtifactOutputs(changeDir, tracksFile);
+    tracksFileExists = tracksPaths.length > 0;
+    for (const tracksPath of tracksPaths) {
+      try {
+        const tasksContent = await fs.promises.readFile(tracksPath, 'utf-8');
+        parsedTasks.push(...parseLocatedTasks(tasksContent, tracksPath));
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException)?.code;
+        const message = error instanceof Error ? error.message : String(error);
+        unavailableTrackingFiles.push({
+          path: tracksPath,
+          reason: code && !message.includes(code) ? `${code}: ${message}` : message,
+        });
+      }
     }
   }
   const tasks = toTaskItems(parsedTasks);
@@ -437,21 +637,46 @@ export async function generateApplyInstructions(
 
   if (missingArtifacts.length > 0) {
     state = 'blocked';
-    instruction = `Cannot apply this change yet. Missing artifacts: ${missingArtifacts.join(', ')}.\nUse the openspec-continue-change skill to create the missing artifacts first.`;
+    const chain =
+      missingPrerequisites.length > missingArtifacts.length
+        ? `\nNot created yet, in build order: ${missingPrerequisites.join(', ')}.` +
+          ` Build the ones this change needs before applying - the schema says which are conditional.`
+        : '';
+    instruction =
+      `Cannot apply this change yet. Missing artifacts: ${missingArtifacts.join(', ')}.${chain}` +
+      `\n${describeArtifactRemedy(
+        changeName,
+        // Only name one when one is left: the first of several would be the
+        // schema's conditional artifact as often as not.
+        missingPrerequisites.length === 1 ? missingPrerequisites[0] : undefined,
+        { many: missingPrerequisites.length > 1 }
+      )}`;
   } else if (tracksFile && !tracksFileExists) {
     // Tracking file configured but doesn't exist yet
     const tracksFilename = path.basename(tracksFile);
     state = 'blocked';
-    instruction = `The ${tracksFilename} file is missing and must be created.\nUse openspec-continue-change to generate the tracking file.`;
+    instruction =
+      `The ${tracksFilename} file is missing and must be created.` +
+      `\n${describeArtifactRemedy(changeName, findArtifactIdFor(schema, tracksFile))}`;
+  } else if (tracksFile && unavailableTrackingFiles.length > 0 && tasks.length === 0) {
+    state = 'blocked';
+    instruction = 'No readable task descriptions are available.';
   } else if (tracksFile && tracksFileExists && tasks.length === 0) {
     // Tracking file exists but lists nothing an agent can work on: either no
     // checkboxes at all, or only checkboxes with no text after them.
     const tracksFilename = path.basename(tracksFile);
     state = 'blocked';
-    instruction = `The ${tracksFilename} file exists but contains no tasks to work on.\nAdd tasks to ${tracksFilename} or regenerate it with openspec-continue-change.`;
-  } else if (tracksFile && remaining === 0 && total > 0) {
+    instruction =
+      `The ${tracksFilename} file exists but contains no tasks to work on.` +
+      `\nAdd tasks to ${tracksFilename}, or rebuild it: ${describeArtifactRemedy(changeName, findArtifactIdFor(schema, tracksFile))}`;
+  } else if (
+    tracksFile &&
+    unavailableTrackingFiles.length === 0 &&
+    remaining === 0 &&
+    total > 0
+  ) {
     state = 'all_done';
-    instruction = 'All tasks are complete! This change is ready to be archived.\nConsider running tests and reviewing the changes before archiving.';
+    instruction = 'All tracked tasks are complete.\nReview or verify the change as appropriate before archiving.';
   } else if (!tracksFile) {
     // No tracking file configured in schema - ready to apply
     state = 'ready';
@@ -461,6 +686,24 @@ export async function generateApplyInstructions(
     instruction = schemaInstruction?.trim() ?? 'Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.';
   }
 
+  if (unavailableTrackingFiles.length > 0) {
+    const unavailableDetails = unavailableTrackingFiles
+      .map((file) => `- ${file.path}: ${file.reason}`)
+      .join('\n');
+    instruction += `\nTask completion is not verified because tracking evidence was unavailable:\n${unavailableDetails}`;
+  }
+
+  const warnings = [
+    ...(context.warnings ?? []),
+    ...(await collectApplyWarnings({
+      state,
+      schema,
+      changeDir,
+      changeName,
+      skippedArtifacts: context.skippedArtifacts,
+    })),
+  ];
+
   return {
     changeName,
     changeDir,
@@ -468,8 +711,12 @@ export async function generateApplyInstructions(
     contextFiles,
     progress: { total, complete, remaining },
     tasks,
+    taskTrackingConfigured: tracksFile !== null,
+    ...(unavailableTrackingFiles.length > 0 ? { unavailableTrackingFiles } : {}),
     state,
     missingArtifacts: missingArtifacts.length > 0 ? missingArtifacts : undefined,
+    ...(missingPrerequisites.length > 0 ? { missingPrerequisites } : {}),
+    ...(warnings.length > 0 ? { warnings } : {}),
     instruction,
     ...(references !== undefined ? { references } : {}),
     ...operationInputs,
@@ -483,7 +730,11 @@ export async function applyInstructionsCommand(options: ApplyInstructionsOptions
     return;
   }
 
-  const spinner = options.json ? undefined : ora('Generating apply instructions...').start();
+  let spinner: Ora | undefined;
+  if (!options.json) {
+    const { default: ora } = await import('ora');
+    spinner = ora('Generating apply instructions...').start();
+  }
 
   try {
     const planningHome = toPlanningHome(root);
@@ -524,7 +775,7 @@ export async function applyInstructionsCommand(options: ApplyInstructionsOptions
 }
 
 export function printApplyInstructionsText(instructions: ApplyInstructions): void {
-  const { changeName, schemaName, contextFiles, progress, tasks, state, missingArtifacts, instruction } = instructions;
+  const { changeName, schemaName, contextFiles, progress, tasks, state, missingArtifacts, warnings, instruction } = instructions;
 
   console.log(`## Apply: ${changeName}`);
   console.log(`Schema: ${schemaName}`);
@@ -540,7 +791,23 @@ export function printApplyInstructionsText(instructions: ApplyInstructions): voi
     console.log('### ⚠️ Blocked');
     console.log();
     console.log(`Missing artifacts: ${missingArtifacts.join(', ')}`);
-    console.log('Use the openspec-continue-change skill to create these first.');
+    if (
+      instructions.missingPrerequisites &&
+      instructions.missingPrerequisites.length > missingArtifacts.length
+    ) {
+      console.log(
+        `Not created yet, in build order: ${instructions.missingPrerequisites.join(', ')}`
+      );
+    }
+    console.log();
+  }
+
+  if (warnings && warnings.length > 0) {
+    console.log('### ⚠️ Warnings');
+    console.log();
+    for (const warning of warnings) {
+      console.log(`- ${warning}`);
+    }
     console.log();
   }
 
@@ -603,7 +870,11 @@ export async function archiveInstructionsCommand(
     return;
   }
 
-  const spinner = options.json ? undefined : ora('Loading archive inputs...').start();
+  let spinner: Ora | undefined;
+  if (!options.json) {
+    const { default: ora } = await import('ora');
+    spinner = ora('Loading archive inputs...').start();
+  }
 
   try {
     const changeName = await validateChangeExists(
@@ -641,6 +912,8 @@ function printOperationInputsText(inputs: {
 }): void {
   if (inputs.context) {
     console.log('### Project Context (required instruction input)');
+    // Printed verbatim on purpose. Escaping a leading `#` would also fire inside
+    // fenced code (`# install deps`), so heading forgery is not guarded here.
     console.log(inputs.context);
     console.log();
   }
@@ -648,7 +921,7 @@ function printOperationInputsText(inputs: {
   if (inputs.operationGuidance && inputs.operationGuidance.length > 0) {
     console.log('### Operation Guidance (advisory)');
     for (const guidance of inputs.operationGuidance) {
-      console.log(`- ${guidance}`);
+      console.log(`- ${sanitizeInline(guidance, Infinity)}`);
     }
     console.log();
   }

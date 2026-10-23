@@ -3,6 +3,8 @@ import path from 'path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
+import { getStoreMetadataPath } from './store/foundation.js';
+
 export const OPERATION_IDS = ['apply', 'archive'] as const;
 export type OperationId = (typeof OPERATION_IDS)[number];
 
@@ -246,6 +248,54 @@ function parseDeclarationList(raw: unknown): DeclarationEntry[] | undefined {
 export const MAX_CONTEXT_SIZE = 50 * 1024; // 50KB hard limit, shared with the references index
 
 /**
+ * Build the warning for an artifact whose `rules:` list is not an array of
+ * strings. Names the offending index and what YAML actually produced there, so
+ * a config that silently loses an entire rule set can be fixed without
+ * bisecting the list by hand. A bare `-` item containing an unquoted ": " is the
+ * common cause: YAML reads it as a mapping, so the hint points at quoting.
+ */
+function describeRulesShapeError(artifactId: string, rules: unknown): string {
+  const base = `Rules for '${artifactId}' must be an array of strings, ignoring this artifact's rules`;
+
+  if (!Array.isArray(rules)) {
+    return `${base}. rules.${artifactId} is ${describeYamlType(rules)}`;
+  }
+
+  const bad = rules
+    .map((rule, index) => ({ rule, index }))
+    .filter(({ rule }) => typeof rule !== 'string');
+
+  if (bad.length === 0) {
+    return base;
+  }
+
+  // Name every offending index with its own shape, so a mixed list does not
+  // have to be re-bisected one item at a time.
+  const details = bad
+    .map(({ rule, index }) => `rules.${artifactId}[${index}] is ${describeYamlType(rule)}`)
+    .join('; ');
+
+  // A bare `-` item with an unquoted ": " is the common cause: YAML reads it as
+  // a mapping. Say so rather than leaving the reader to work out the quoting.
+  const hasMapping = bad.some(({ rule }) => rule !== null && typeof rule === 'object' && !Array.isArray(rule));
+  const hint = hasMapping
+    ? ' — an unquoted ": " makes YAML read the item as a key/value pair; quote the whole scalar to keep it a string.'
+    : '';
+
+  return `${base}. ${details}${hint}`;
+}
+
+/** Name a YAML value's shape in a warning, e.g. "a mapping" or "a number". */
+function describeYamlType(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'a nested list';
+  const type = typeof value;
+  if (type === 'object') return 'a mapping';
+  if (type === 'number' || type === 'boolean') return `a ${type}`;
+  return `a ${type}`;
+}
+
+/**
  * Read and parse openspec/config.yaml from project root.
  * Uses resilient parsing - validates each field independently using Zod safeParse.
  * Returns null if file doesn't exist.
@@ -339,9 +389,7 @@ export function readProjectConfig(projectRoot: string): ProjectConfig | null {
               );
             }
           } else {
-            console.warn(
-              `Rules for '${artifactId}' must be an array of strings, ignoring this artifact's rules`
-            );
+            console.warn(describeRulesShapeError(artifactId, rules));
           }
         }
 
@@ -577,7 +625,10 @@ export function storePointerProblem(reason: 'unparseable' | 'non_string'): strin
 }
 
 export interface OpenSpecDirClassification {
-  /** True when openspec/specs or openspec/changes exists as a directory. */
+  /**
+   * True when openspec/specs or openspec/changes exists as a directory
+   * that is not itself a store root.
+   */
   hasPlanningShape: boolean;
   pointer: StorePointerRead;
 }
@@ -586,13 +637,22 @@ export interface OpenSpecDirClassification {
  * One classification for "real root vs config-only pointer dir", shared
  * by root resolution and the init pointer guard so they can never
  * disagree (slice 3.2).
+ *
+ * A specs/ or changes/ directory carrying store metadata is a store at
+ * the recommended `~/openspec/<id>` layout whose id is `specs` or
+ * `changes`, not planning content of the directory above it. Counting it
+ * would make $HOME the phantom root the qualifying walk exists to prevent.
  */
 export function classifyOpenSpecDir(projectRoot: string): OpenSpecDirClassification {
   const openspecDir = path.join(projectRoot, 'openspec');
   const hasPlanningShape =
-    isDirectorySync(path.join(openspecDir, 'specs')) ||
-    isDirectorySync(path.join(openspecDir, 'changes'));
+    isPlanningDirectorySync(path.join(openspecDir, 'specs')) ||
+    isPlanningDirectorySync(path.join(openspecDir, 'changes'));
   return { hasPlanningShape, pointer: readStorePointer(projectRoot) };
+}
+
+function isPlanningDirectorySync(candidatePath: string): boolean {
+  return isDirectorySync(candidatePath) && !existsSync(getStoreMetadataPath(candidatePath));
 }
 
 function isDirectorySync(candidatePath: string): boolean {

@@ -24,7 +24,7 @@ vi.mock('@inquirer/prompts', () => ({
 }));
 
 async function runStoreCommand(args: string[]): Promise<void> {
-  const { registerStoreCommand } = await import('../../src/commands/store.js');
+  const { registerStoreCommand } = await import('../../src/cli/commands/store.js');
   const program = new Command();
   registerStoreCommand(program);
   await program.parseAsync(['node', 'openspec', 'store', ...args]);
@@ -420,7 +420,7 @@ describe('store command', () => {
     const storeRoot = path.join(repoRoot, 'team-context');
 
     const result = await runCLI(
-      ['store', 'setup', 'team-context', '--path', storeRoot, '--no-init-git', '--json'],
+      ['store', 'setup', 'team-context', '--path', storeRoot, '--json'],
       { cwd: tempDir, env }
     );
 
@@ -440,7 +440,7 @@ describe('store command', () => {
     const storeRoot = path.join(repoRoot, 'team-context');
 
     const result = await runCLI(
-      ['store', 'setup', 'team-context', '--path', storeRoot, '--no-init-git', '--json'],
+      ['store', 'setup', 'team-context', '--path', storeRoot, '--json'],
       { cwd: tempDir, env }
     );
 

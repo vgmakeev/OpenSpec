@@ -78,15 +78,14 @@ const SKILL_INVOCATION_PREFIX: Record<string, string> = {
 };
 
 /**
- * Tools that have no slash-command surface at all: skills are matched
- * automatically or invoked by natural-language prompts, never by typing a
- * `/<name>` command. Rovo Dev CLI is such a tool — `/skills` only manages
- * skills, and any `/openspec-*` form would be a dead command (see
- * docs/supported-tools.md). References for these tools are spelled as prose
- * ("the openspec-propose skill") so generated content never tells the user to
- * type a command their CLI does not register.
+ * Tools with no documented slash invocation for skills: use automatic
+ * matching or natural-language prompts instead. SourceCraft Code Assistant
+ * supports separate command files, but its skills use description matching.
+ * Rovo Dev's `/skills` only manages skills (see docs/supported-tools.md).
+ * Skill references for these tools are spelled as prose ("the openspec-propose
+ * skill") so skills-only delivery does not advertise unregistered commands.
  */
-const NATURAL_LANGUAGE_SKILL_TOOLS = new Set<string>(['rovodev']);
+const NATURAL_LANGUAGE_SKILL_TOOLS = new Set<string>(['gsd', 'rovodev', 'codeassistant']);
 
 /**
  * Whether a tool references skills by natural language rather than a slash
@@ -172,7 +171,7 @@ export function getSkillReferenceTransformer(toolId: string): (text: string) => 
  * commands — because delivery is skills-only, because the tool has no command
  * surface at all (capability 'none', e.g. Kimi Code or Mistral Vibe), or
  * because the tool invokes skills directly and OpenSpec generates no command
- * files for it (capability 'skills-invocable', i.e. Codex) — so those skills
+ * files for it (capability 'skills-invocable', e.g. Codex or Warp) — so those skills
  * never point at commands that were not generated.
  *
  * When commands are generated, the spelling follows the tool's invocation: a
